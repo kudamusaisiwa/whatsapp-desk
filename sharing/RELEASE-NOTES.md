@@ -15,7 +15,7 @@ WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **
 
 ## Download this file
 
-**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
+**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.2/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
 
 For Chrome Web Store submission, use **WhatsApp-Desk-WebStore.zip** from the
 same release. It has `manifest.json` at the ZIP root, keeps automatic sending
@@ -74,7 +74,7 @@ The supplied screenshot below shows the earlier MG Desk name with fictional samp
 
 The extension starts with **no key or business knowledge**. **Auto-send, Draft as messages arrive and Reply across all chats start off.**
 
-The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code remains v0.3.1.
+The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code is v0.3.2.
 
 ## Included and privacy
 

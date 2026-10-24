@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-desk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Open-source WhatsApp Web assistant with local business knowledge and bring-your-own OpenAI key",
   "scripts": {
     "dev": "vite",

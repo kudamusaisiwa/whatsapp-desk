@@ -1,10 +1,10 @@
 WHATSAPP DESK — START HERE
-Chrome extension • Version 0.3.1 • Bring your own OpenAI API key
+Chrome extension • Version 0.3.2 • Bring your own OpenAI API key
 
 1. INSTALL IN CHROME
 
 1) Download WhatsApp-Desk.zip and unzip it:
-   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip
+   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.2/WhatsApp-Desk.zip
 2) Keep the extracted WhatsApp Desk folder somewhere permanent, such as Documents.
 3) Open chrome://extensions in Chrome and turn on Developer mode.
 4) Click Load unpacked and select this folder inside the unzipped download:
