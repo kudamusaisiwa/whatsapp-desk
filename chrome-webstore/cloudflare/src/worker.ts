@@ -3,8 +3,8 @@ interface Env {
   DB: D1Database;
   PUBLIC_BASE_URL: string;
   STORE_URL: string;
-  STRIPE_PRICE_ID: string;
-  STRIPE_SECRET_KEY: string;
+  STRIPE_PAYMENT_LINK_ID: string;
+  STRIPE_PAYMENT_LINK_URL: string;
   STRIPE_WEBHOOK_SECRET: string;
   LICENSE_TOKEN_SECRET: string;
 }
@@ -151,48 +151,23 @@ async function currentInstallation(id: string, env: Env) {
   return row;
 }
 
-async function stripeRequest(path: string, env: Env, init: RequestInit = {}) {
-  const response = await fetch(`https://api.stripe.com${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-      ...(init.headers ?? {}),
-    },
-  });
-  const body = await response.text();
-  let parsed: Record<string, unknown> = {};
-  try {
-    parsed = JSON.parse(body) as Record<string, unknown>;
-  } catch {
-    // Keep the error generic; never reflect raw Stripe responses to clients.
-  }
-  if (!response.ok) throw new Error("Stripe request failed.");
-  return parsed;
-}
-
 async function createCheckout(body: Record<string, unknown>, env: Env) {
   const installationId = body.installationId;
   if (!validInstallationId(installationId)) throw new Error("Invalid installation identifier.");
   const row = await currentInstallation(installationId, env);
   if (row.status === "paid") return { url: `${env.PUBLIC_BASE_URL}/success.html?already_paid=1` };
-  const form = new URLSearchParams();
-  form.set("mode", "payment");
-  form.set("line_items[0][price]", env.STRIPE_PRICE_ID);
-  form.set("line_items[0][quantity]", "1");
-  form.set("client_reference_id", installationId);
-  form.set("metadata[installation_id]", installationId);
-  form.set("success_url", `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/success.html?session_id={CHECKOUT_SESSION_ID}`);
-  form.set("cancel_url", `${env.PUBLIC_BASE_URL.replace(/\/$/, "")}/#pricing`);
+  let checkoutUrl: URL;
+  try {
+    checkoutUrl = new URL(env.STRIPE_PAYMENT_LINK_URL);
+  } catch {
+    throw new Error("Stripe Payment Link is not configured.");
+  }
+  if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "buy.stripe.com")
+    throw new Error("Stripe Payment Link is not configured.");
+  checkoutUrl.searchParams.set("client_reference_id", installationId);
   const email = validEmail(body.email) ? body.email : null;
-  if (email) form.set("customer_email", email);
-  const session = await stripeRequest("/v1/checkout/sessions", env, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form,
-  });
-  if (typeof session.url !== "string" || !session.url.startsWith("https://checkout.stripe.com/"))
-    throw new Error("Stripe did not return a hosted checkout URL.");
-  return { url: session.url };
+  if (email) checkoutUrl.searchParams.set("prefilled_email", email);
+  return { url: checkoutUrl.toString() };
 }
 
 function signatureParts(value: string) {
@@ -222,11 +197,10 @@ async function fulfilCheckout(session: Record<string, unknown>, env: Env) {
   if (session.payment_status !== "paid") return false;
   if (session.currency !== "usd" || session.amount_total !== 999)
     throw new Error("Checkout amount or currency did not match the configured product.");
+  if (session.payment_link !== env.STRIPE_PAYMENT_LINK_ID)
+    throw new Error("Checkout did not use the configured Stripe Payment Link.");
   const sessionId = typeof session.id === "string" ? session.id : "";
   if (!sessionId) throw new Error("Checkout is missing its session identifier.");
-  const lineItems = await stripeRequest(`/v1/checkout/sessions/${encodeURIComponent(sessionId)}/line_items?limit=10`, env);
-  const firstPrice = ((lineItems.data as Array<Record<string, unknown>> | undefined)?.[0]?.price as Record<string, unknown> | undefined)?.id;
-  if (firstPrice !== env.STRIPE_PRICE_ID) throw new Error("Checkout Price did not match the configured product.");
   const customerDetails = session.customer_details as Record<string, unknown> | undefined;
   const email = typeof customerDetails?.email === "string" ? customerDetails.email.slice(0, 320) : null;
   const current = now();

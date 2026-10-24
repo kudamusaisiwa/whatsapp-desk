@@ -9,8 +9,9 @@ manual-install release is unchanged.
 - One-time **$9.99 USD** unlock through Stripe Checkout.
 - The customer supplies their own OpenAI API key. No OpenAI key is included,
   shared or billed by WhatsApp Desk.
-- Stripe secrets, webhook signing secrets and payment records stay on the
-  licensing service. They must never be placed in the extension package.
+- The Worker uses a hosted Stripe Payment Link, so no Stripe API secret is
+  needed in the extension or licensing service. The webhook signing secret and
+  payment records stay on the licensing service.
 
 Stripe's one-time Checkout mode does not have a subscription trial. The trial
 is therefore issued by the licensing service, and the $9.99 payment is a
@@ -76,9 +77,10 @@ npm install
 npx wrangler whoami
 ```
 
-Create the D1 database, apply `migrations/0001_initial.sql`, set the three
-Worker secrets (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and
-`LICENSE_TOKEN_SECRET`), then deploy. The Worker URL becomes
+Create the D1 database, apply `migrations/0001_initial.sql`, set the two
+Worker secrets (`STRIPE_WEBHOOK_SECRET` and `LICENSE_TOKEN_SECRET`), then
+deploy. Configure the live Payment Link ID and URL as Worker variables. The
+Worker URL becomes
 `WHATSAPP_DESK_LICENSE_API_URL` for the extension package command.
 
 ## Licensing service contract

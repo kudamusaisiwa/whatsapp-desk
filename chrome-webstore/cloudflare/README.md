@@ -3,8 +3,8 @@
 This Worker serves the WhatsApp Desk landing page, the privacy/terms pages,
 and the small licensing API used by the Chrome Web Store build. Workers Static
 Assets serves `public/`; D1 stores installation and verified-payment state.
-Stripe is called only from the Worker. No Stripe or OpenAI secret belongs in
-the extension ZIP.
+Stripe Checkout is hosted by a Payment Link. The Worker only receives signed
+webhooks; no Stripe API key or OpenAI secret belongs in the extension ZIP.
 
 ## One-time setup
 
@@ -23,7 +23,9 @@ there before deploying:
 - `PUBLIC_BASE_URL` — the final `https://` Worker/site URL;
 - `STORE_URL` — the published Chrome Web Store listing URL (the `/install`
   redirect is safe to leave pointed at the Web Store home until publishing);
-- `STRIPE_PRICE_ID` — the live one-time USD Price for **$9.99**.
+- `STRIPE_PAYMENT_LINK_ID` — the live Payment Link used for the **$9.99**
+  one-time purchase;
+- `STRIPE_PAYMENT_LINK_URL` — its public `https://buy.stripe.com/...` URL.
 
 Do not deploy with any `REPLACE_...` value still present. The production
 deployment for this repository is currently
@@ -39,11 +41,10 @@ Apply the schema remotely:
 npm run d1:migrate:remote
 ```
 
-Create the three Worker secrets. Use a separate set for test and live
+Create the two Worker secrets. Use a separate set for test and live
 deployments:
 
 ```sh
-npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put LICENSE_TOKEN_SECRET
 ```
@@ -62,9 +63,11 @@ Configure a Stripe webhook at
 - `checkout.session.async_payment_succeeded`
 
 Copy the endpoint signing secret into `STRIPE_WEBHOOK_SECRET`. The Worker
-checks the signature, configured Price, amount, currency and payment status
-before marking an installation as paid. Stripe may retry events, so the D1
-write is idempotent.
+checks the signature, configured Payment Link, amount, currency and payment
+status before marking an installation as paid. Stripe may retry events, so the
+D1 write is idempotent. The `client_reference_id` URL parameter carries the
+installation identifier into the Checkout Session without exposing a Stripe
+API key.
 
 After the first successful deployment, set `PUBLIC_BASE_URL` to the exact
 Worker URL, create the webhook against that URL, and deploy once more so the
@@ -93,6 +96,7 @@ WHATSAPP_DESK_LICENSE_API_URL=https://YOUR_WORKER_DOMAIN \
   npm run package:webstore
 ```
 
-The extension only receives the public Worker URL. It opens Stripe's hosted
-Checkout page, then refreshes its license status after the verified webhook
-marks the installation paid.
+The extension only receives the public Worker URL. The Worker returns Stripe's
+hosted Payment Link with a per-installation `client_reference_id`, then the
+extension refreshes its license status after the verified webhook marks the
+installation paid.

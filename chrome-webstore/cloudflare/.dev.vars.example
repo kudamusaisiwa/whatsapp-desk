@@ -1,5 +1,4 @@
 # Local-only Worker secrets. Copy to .dev.vars and replace every value.
 # Never commit .dev.vars or real Stripe credentials.
-STRIPE_SECRET_KEY=replace-with-test-secret
 STRIPE_WEBHOOK_SECRET=replace-with-test-webhook-secret
 LICENSE_TOKEN_SECRET=replace-with-a-long-random-secret
