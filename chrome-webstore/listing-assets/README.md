@@ -3,6 +3,8 @@
 These assets are prepared for the Chrome Web Store listing for **Desk AI for WhatsApp Web**.
 
 - `desk-ai-screenshot.png` — 1280 × 800 RGB PNG, derived from the project preview image.
+- `desk-ai-small-tile.png` — 440 × 280 RGB PNG for the small promo tile.
+- `desk-ai-marquee.png` — 1400 × 560 RGB PNG for the marquee promo tile.
 - `desk-ai-icon.png` — 128 × 128 RGB PNG, derived from the extension icon.
 
 The source artwork uses fictional sample conversations. No API keys, customer records, or
