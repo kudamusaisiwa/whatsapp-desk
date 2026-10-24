@@ -24,6 +24,18 @@ On Mac, double-click the ZIP to unzip it. On Windows, right-click → **Extract 
 
 Requires desktop Chrome 120 or later. A managed work browser may require IT approval.
 
+## Installation examples
+
+These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome://extensions` and use the **Developer mode** and **Load unpacked** controls shown below.
+
+**1. Turn on Developer mode.**
+
+![Enable Developer mode in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/enable-developer-mode.png)
+
+**2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
+
+![Click Load unpacked in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/load-unpacked.png)
+
 ## Connect your key and business
 
 1. Create your own key on the **[OpenAI API keys page](https://platform.openai.com/api-keys)** and set up API billing. API usage is charged separately from a ChatGPT subscription.

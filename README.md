@@ -21,6 +21,18 @@ Keep Developer mode enabled and keep the installed folder. Chrome 120 or later i
 
 The ZIP includes a [visual setup guide](sharing/START-HERE.html) and [plain-text instructions](sharing/START-HERE.txt) covering setup, troubleshooting and updates. Chrome documents this installation flow in its [official extension guide](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world).
 
+### Installation examples
+
+These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome://extensions` and use the **Developer mode** and **Load unpacked** controls shown below.
+
+**1. Turn on Developer mode.**
+
+![Enable Developer mode in the extensions page](docs/images/enable-developer-mode.png)
+
+**2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
+
+![Click Load unpacked in the extensions page](docs/images/load-unpacked.png)
+
 ## What it does
 
 - **Business knowledge:** add PDF, DOCX, TXT, Markdown, CSV or JSON files, or write notes. Text extraction happens locally. Scanned PDFs need OCR first. Maximum 10 MB and 300,000 extracted characters per document; 2 million characters across the library.
