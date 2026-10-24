@@ -1,50 +1,26 @@
 WHATSAPP DESK — START HERE
 Chrome extension • Version 0.3.1 • Bring your own OpenAI API key
 
-1. INSTALL IN CHROME — MAC AND WINDOWS
+1. INSTALL IN CHROME
 
-DOWNLOAD THIS FILE:
-https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip
-Choose the file named WhatsApp-Desk.zip in the release Assets section.
-GitHub's Source code (zip) and Source code (tar.gz) downloads are for developers.
+1) Download WhatsApp-Desk.zip and unzip it:
+   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip
+2) Keep the extracted WhatsApp Desk folder somewhere permanent, such as Documents.
+3) Open chrome://extensions in Chrome and turn on Developer mode.
+4) Click Load unpacked and select this folder inside the unzipped download:
 
-1) Extract WhatsApp-Desk.zip.
-   Mac: double-click the downloaded ZIP.
-   Windows: right-click the ZIP, choose Extract All, then Extract.
-2) Open the extracted folder in Finder or File Explorer. Look for these files:
+   WhatsApp Desk/releases/WhatsApp-Desk
 
-   WhatsApp-Desk/
-       manifest.json
-       background.js
-       content.js
-       panel.html
-       START-HERE.html
-       assets/
-       icons/
+   Open WhatsApp Desk, then releases, then select WhatsApp-Desk.
+5) Open or refresh https://web.whatsapp.com. WhatsApp Desk appears on the right.
 
-   IMPORTANT: manifest.json must be directly inside the folder you select.
-   If you see another WhatsApp-Desk folder inside, open that inner folder.
-3) Move this WhatsApp-Desk folder somewhere permanent, such as Documents.
-   Keep it there: Chrome loads the extension from this folder each time.
-4) Open Chrome. Type chrome://extensions in the address bar and press Enter.
-5) Turn on Developer mode at the top right.
-6) Click Load unpacked. In the folder chooser, select the WhatsApp-Desk folder
-   you checked in step 2. Click Select Folder (Windows) or Select (Mac).
-   Select the whole folder; do not select the ZIP or manifest.json itself.
-7) Check that a WhatsApp Desk card appears in Chrome's extension list and
-   that its enable switch is on. Keep Developer mode on.
-8) Open https://web.whatsapp.com and sign in. If WhatsApp was already open,
-   refresh it. WhatsApp Desk appears on the right.
+On Mac, double-click the ZIP to unzip it. On Windows, right-click > Extract All.
+Use the named WhatsApp-Desk.zip release download; Source code downloads are for developers.
+Keep Developer mode on and keep the extracted folder. No coding is needed.
+Requires desktop Chrome 120 or later; managed work browsers may need IT approval.
 
-IF CHROME SAYS “MANIFEST FILE IS MISSING OR UNREADABLE”:
-Click Cancel, then Load unpacked again. Choose the folder with manifest.json
-DIRECTLY inside it, as shown above. The project source folder cannot be loaded.
-If you built from source, choose the project's dist folder instead.
-
-No coding, npm or terminal commands are needed for the release ZIP.
-Requires desktop Chrome 120 or later. A managed work browser may require IT
-approval. This is a manual installation with manual updates, not a Chrome
-Web Store listing. Its Chrome toolbar button opens or collapses the panel.
+If Chrome says "Manifest file is missing or unreadable", click Cancel and
+Load unpacked again, then select WhatsApp Desk/releases/WhatsApp-Desk.
 
 2. CONNECT YOUR OWN OPENAI KEY
 
@@ -105,10 +81,8 @@ This is an independent assistant, not an official Meta/WhatsApp product.
 
 - No panel: check the extension is enabled at chrome://extensions, then
   refresh WhatsApp Web. Collapse/expand it with its Chrome toolbar button.
-- Cannot find manifest.json: fully extract WhatsApp-Desk.zip, then select the
-  inner folder with manifest.json directly inside it using Load unpacked.
-  If you are using the developer source project, build it first and select its
-  dist folder. The source project root cannot be loaded as an extension.
+- Cannot find manifest.json: unzip WhatsApp-Desk.zip, click Load unpacked and
+  select WhatsApp Desk/releases/WhatsApp-Desk.
 - Key rejected: replace it with your own valid OpenAI API key in Settings.
 - Usage/rate limit: check your API billing, credits and project limits.
 - Model unavailable: refresh the model list and choose a compatible model.

@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, readdirSync, lstatSync, copyFileSync, mkdirSync, rmSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, lstatSync, copyFileSync, mkdirSync, rmSync, renameSync, mkdtempSync, cpSync } from "node:fs";
 import { resolve, relative, join } from "node:path";
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { writeNotices } from "./notices.mjs";
 
 function run(command, args, options = {}) {
@@ -24,6 +25,7 @@ writeNotices(join(root, "THIRD-PARTY-NOTICES.txt"));
 const allowed = /^(manifest\.json|panel\.html|background\.js|content\.js|LICENSE|THIRD-PARTY-NOTICES\.txt|START-HERE\.(html|txt)|icons\/(16|48|128)\.png|assets\/[\w.-]+\.(m?js|css|woff2?))$/;
 const privateMarkers = /BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/;
 const credentials = /(?:sk-(?:proj-|svcacct-|ant-)?[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{35}|gh[pousr]_[A-Za-z0-9]{36,}|(?:AKIA|ASIA)[A-Z0-9]{16}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)/;
+const installFolder = "WhatsApp Desk/releases/WhatsApp-Desk";
 const inventory = [];
 function inspect(dir) {
   for (const name of readdirSync(dir).sort()) {
@@ -39,7 +41,7 @@ function inspect(dir) {
       if (privateMarkers.test(text)) throw new Error(`Private content remains in ${file}`);
       if (credentials.test(text)) throw new Error(`Possible credential detected in ${file}; inspect locally.`);
     }
-    inventory.push({ file, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
+    inventory.push({ file: `${installFolder}/${file}`, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
   }
 }
 inspect(root);
@@ -48,12 +50,20 @@ if (manifest.name !== "WhatsApp Desk" || manifest.key || manifest.update_url)
   throw new Error("Unexpected shared manifest identity or update configuration.");
 run("gitleaks", ["dir", root, "--redact", "--no-banner", "--ignore-gitleaks-allow", "--report-format", "json", "--report-path", join(audit, "release.json")]);
 rmSync(pending, { force: true });
+const staging = mkdtempSync(join(tmpdir(), "whatsapp-desk-package-"));
 try {
-  run("zip", ["-q", "-r", pending, "WhatsApp-Desk"], { cwd: resolve("releases") });
+  cpSync(root, join(staging, installFolder), { recursive: true });
+  for (const name of ["START-HERE.html", "START-HERE.txt"]) {
+    copyFileSync(join(root, name), join(staging, "WhatsApp Desk", name));
+    const bytes = readFileSync(join(root, name));
+    inventory.push({ file: `WhatsApp Desk/${name}`, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") });
+  }
+  run("zip", ["-q", "-r", pending, "WhatsApp Desk"], { cwd: staging });
   run("unzip", ["-tq", pending]);
   run("gitleaks", ["dir", pending, "--max-archive-depth", "1", "--redact", "--no-banner", "--ignore-gitleaks-allow", "--report-format", "json", "--report-path", join(audit, "archive.json")]);
   renameSync(pending, zip);
 } finally {
+  rmSync(staging, { recursive: true, force: true });
   rmSync(pending, { force: true });
 }
 const sha256 = createHash("sha256").update(readFileSync(zip)).digest("hex");
@@ -65,6 +75,7 @@ writeFileSync(resolve("releases/WhatsApp-Desk-audit.json"), `${JSON.stringify({
   scanner: "Gitleaks; built folder and final ZIP, redacted reports in test-results/share-audit",
   detectedSecrets: 0,
   browserProfileIncluded: false,
+  installFolder,
   packaging: "Built extension files and installation guides only. No browser profile, source, history, .env, client data or knowledge-base files.",
   limitations: "Automated scanning is not a guarantee against every possible secret. Fresh-install behavior is covered by mocked extension tests; recipient Chrome install still needs to be performed.",
   sha256,

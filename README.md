@@ -7,9 +7,9 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 ## Install — no coding needed
 
 1. Download **WhatsApp-Desk.zip** from the [latest release](https://github.com/kudamusaisiwa/whatsapp-desk/releases/latest).
-2. Extract it and keep the **WhatsApp-Desk** folder somewhere permanent.
+2. Unzip it and keep the extracted **WhatsApp Desk** folder somewhere permanent.
 3. In desktop Chrome, open `chrome://extensions` and turn on **Developer mode**.
-4. Click **Load unpacked** and choose the extracted folder containing `manifest.json`.
+4. Click **Load unpacked** and select **`WhatsApp Desk/releases/WhatsApp-Desk`** inside the unzipped download.
 5. Open or refresh [WhatsApp Web](https://web.whatsapp.com). WhatsApp Desk appears on the right.
 6. Open **Settings**, enter your own OpenAI API key, and choose **Save key & connect**. Select a compatible model available to your project.
 7. Set your business name and reply style, then add approved documents or notes in **Knowledge**.

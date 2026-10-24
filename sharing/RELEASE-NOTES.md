@@ -6,39 +6,23 @@ WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **
 
 In the **Assets** section below, choose **WhatsApp-Desk.zip**. GitHub also shows **Source code (zip)** and **Source code (tar.gz)**: those are developer downloads and cannot be loaded straight into Chrome.
 
-## Install in Chrome — Mac and Windows
+## Install in Chrome
 
-1. **Extract the ZIP.** On Mac, double-click it. On Windows, right-click → **Extract All** → **Extract**.
-2. **Open the extracted folder** in Finder or File Explorer. Check that `manifest.json` is directly inside it. If there is another `WhatsApp-Desk` folder inside, open that inner folder.
-3. Move that **WhatsApp-Desk** folder somewhere permanent, such as **Documents**. Keep it there: Chrome loads the extension from that folder.
-4. Open Chrome, type **`chrome://extensions`** in its address bar and press **Enter**.
-5. Turn on **Developer mode** at the top right.
-6. Click **Load unpacked**. Select the **whole WhatsApp-Desk folder containing `manifest.json`**, then click **Select Folder** (Windows) or **Select** (Mac). Do not select the ZIP or `manifest.json` itself.
-7. Check that a **WhatsApp Desk** card appears in Chrome’s extension list and its enable switch is on. Keep Developer mode enabled.
-8. Open **[WhatsApp Web](https://web.whatsapp.com)** and sign in. If it was already open, refresh it. The WhatsApp Desk panel appears on the right.
+1. **Download WhatsApp-Desk.zip and unzip it.**
+2. Keep the extracted **WhatsApp Desk** folder somewhere permanent, such as Documents.
+3. Open **`chrome://extensions`** in Chrome and turn on **Developer mode**.
+4. Click **Load unpacked** and select this folder inside the unzipped download:
 
-The folder you select should look like this:
+   **`WhatsApp Desk/releases/WhatsApp-Desk`**
 
-```text
-WhatsApp-Desk/          ← select this folder in Load unpacked
-    manifest.json      ← must be directly inside the selected folder
-    background.js
-    content.js
-    panel.html
-    START-HERE.html
-    assets/
-    icons/
-```
+   Open **WhatsApp Desk** → **releases** → select **WhatsApp-Desk**.
+5. Open or refresh **[WhatsApp Web](https://web.whatsapp.com)**. The assistant appears on the right.
 
-**No coding, npm or terminal commands are needed for this ZIP.** Requires desktop Chrome 120 or later. A managed work browser may require approval from your IT administrator.
+On Mac, double-click the ZIP to unzip it. On Windows, right-click → **Extract All**. Keep Developer mode on and keep the extracted folder. No coding is needed.
 
-## If Chrome says “Manifest file is missing or unreadable”
+**“Manifest file is missing or unreadable”?** Click **Cancel**, then **Load unpacked** again and select **`WhatsApp Desk/releases/WhatsApp-Desk`**.
 
-Click **Cancel**, then **Load unpacked** again. Choose the folder that has `manifest.json` **directly inside it**, as shown above.
-
-- If you selected the outer extraction folder, open it and choose the inner **WhatsApp-Desk** folder.
-- If you downloaded **Source code (zip)**, use **[WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip)** instead.
-- If you deliberately built the developer source project, choose its **`dist`** folder. The project root (for example, `Documents/WhatsApp Desk`) cannot be loaded as an extension.
+Requires desktop Chrome 120 or later. A managed work browser may require IT approval.
 
 ## Connect your key and business
 
@@ -50,7 +34,7 @@ Click **Cancel**, then **Load unpacked** again. Choose the folder that has `mani
 
 The extension starts with **no key or business knowledge**. **Auto-send, Draft as messages arrive and Reply across all chats start off.**
 
-The ZIP includes **START-HERE.html**, a visual guide you can double-click to open, and **START-HERE.txt** for plain-text instructions. These installation guides have been refreshed to explain folder selection and the missing-manifest error; the extension code remains v0.3.1.
+The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code remains v0.3.1.
 
 ## Included and privacy
 
