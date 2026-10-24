@@ -1,0 +1,102 @@
+WHATSAPP DESK — START HERE
+Chrome extension • Version 0.3.1 • Bring your own OpenAI API key
+
+1. INSTALL IN CHROME
+
+1) Save WhatsApp-Desk.zip to your computer.
+2) Extract the ZIP: on Windows, right-click > Extract All; on Mac, double-click.
+3) Move the extracted WhatsApp-Desk folder somewhere permanent, such as Documents.
+   Keep this folder: Chrome loads the extension from it.
+4) In Chrome's address bar, type chrome://extensions and press Enter.
+5) Turn on Developer mode at the top right. Keep it on while using this extension.
+6) Click Load unpacked. Select the WhatsApp-Desk folder containing manifest.json.
+   Select the folder, not the ZIP. If extraction made an extra outer folder,
+   open it and select the inner folder that contains manifest.json.
+7) Open https://web.whatsapp.com and sign in with your own WhatsApp account.
+   If it was already open, refresh the page. WhatsApp Desk appears on the right.
+   Its Chrome toolbar button opens or collapses the panel.
+
+No coding, npm or terminal commands are needed. This is a manually installed
+extension, with manual updates; it is not a Chrome Web Store listing.
+Requires desktop Chrome 120 or later. An organisation-managed browser may
+require your IT administrator to allow Developer mode or this extension.
+
+2. CONNECT YOUR OWN OPENAI KEY
+
+1) Sign in to https://platform.openai.com/api-keys and create your own secret key.
+2) Make sure API billing is set up in your OpenAI account. API usage is charged
+   to your account separately from a ChatGPT subscription.
+3) In WhatsApp Desk, open Settings. Paste the key under OpenAI connection and
+   click Save key & connect.
+4) Refresh the model list. Choose a model available to your project that
+   supports Responses and structured output (and image input for pictures).
+   Save workspace settings. You can also enter an exact model ID.
+
+This edition currently supports OpenAI keys only. No key is supplied.
+Never send your secret key to the person who gave you this ZIP.
+The entered key is saved only in this extension's local browser storage and
+is sent to OpenAI for authentication. It is not synced or exposed to the
+WhatsApp webpage. It is not independently encrypted: someone with access
+to your browser profile or extension developer tools may access it.
+To remove it, use Settings > Remove saved key.
+
+3. ADD YOUR BUSINESS
+
+1) In Settings, replace Your business with your business name.
+2) Set your assistant's reply style. Match the date order to the dates shown
+   in WhatsApp, then click Save workspace settings.
+3) In Knowledge, upload your business information or write a note: services,
+   prices, opening hours, policies, contact details and FAQs. Supported files:
+   PDF, DOCX, TXT, Markdown, CSV and JSON. Scanned PDFs need OCR first.
+4) Open a one-to-one chat and click Draft a reply. Review the draft in the
+   WhatsApp message box, edit it if needed, then send it yourself.
+
+The business library starts empty. No sender's business knowledge, saved
+keys, customer conversations, notes or follow-ups are included in this ZIP.
+Auto-send, Draft as messages arrive and Reply across all chats start OFF.
+You can enable these controls later after checking your own drafts.
+Only enable automatic sending when you are happy for replies to send without
+review. A reply flagged for human review still stays as a draft.
+
+4. PRIVACY AND EVERYDAY USE
+
+AI drafting sends relevant business knowledge and recent visible chat messages
+directly to OpenAI. Loaded photos/screenshots may be included. The recipient
+must be comfortable using AI with their business and customer information.
+The extension requests that OpenAI not store response objects (store: false);
+OpenAI's own API data policies still apply. There is no hosted app backend
+or analytics in this extension.
+
+Keys, knowledge, client notes and follow-ups stay in this browser profile.
+Removing the extension removes its local data. Chrome must be running and
+the computer awake for timely automation/reminders. Keep WhatsApp signed in.
+All-chat mode watches the newest visible inbox rows; keep the All inbox at
+the top for coverage. It does not scan the complete account history.
+For screenshots/photos, open or download them in WhatsApp if needed.
+Voice notes, videos and document attachments from chats are not read.
+This is an independent assistant, not an official Meta/WhatsApp product.
+
+5. IF SOMETHING DOES NOT WORK
+
+- No panel: check the extension is enabled at chrome://extensions, then
+  refresh WhatsApp Web. Collapse/expand it with its Chrome toolbar button.
+- Cannot find manifest.json: fully extract the ZIP, then select the correct
+  inner WhatsApp-Desk folder using Load unpacked.
+- Key rejected: replace it with your own valid OpenAI API key in Settings.
+- Usage/rate limit: check your API billing, credits and project limits.
+- Model unavailable: refresh the model list and choose a compatible model.
+- Generic or missing answers: add your own approved documents in Knowledge.
+- Interface changed: WhatsApp changes can require an extension update.
+
+UPDATING
+Keep the same installed folder and replace its files with the new version.
+At chrome://extensions, click Reload on WhatsApp Desk, then refresh WhatsApp.
+Avoid removing/reinstalling if you want to retain the extension's local data.
+
+OFFICIAL REFERENCES
+Chrome installation:
+https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world
+OpenAI API keys:
+https://platform.openai.com/api-keys
+Separate API billing:
+https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform
