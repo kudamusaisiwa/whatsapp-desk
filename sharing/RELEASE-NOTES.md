@@ -4,6 +4,15 @@ WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **
 
 *WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
 
+## Feature highlights
+
+- **Live 24-hour response timer:** see hours, minutes and seconds remaining from the latest observed customer message, with clear open/closed status to help manage follow-ups.
+- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; WhatsApp Desk needs no Meta Business Manager or WhatsApp Cloud API setup.
+- **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
+- **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
+- **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
+- **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
+
 ## Download this file
 
 **[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
@@ -27,6 +36,10 @@ On Mac, double-click the ZIP to unzip it. On Windows, right-click → **Extract 
 **“Manifest file is missing or unreadable”?** Click **Cancel**, then **Load unpacked** again and select **`WhatsApp Desk/releases/WhatsApp-Desk`**.
 
 Requires desktop Chrome 120 or later. A managed work browser may require IT approval.
+
+### Link your WhatsApp Business account
+
+Open [WhatsApp Web](https://web.whatsapp.com). On your phone, open **WhatsApp Business → Linked devices → Link a device**, then scan the QR code shown on your computer. After linking, the extension works beside your chats. See [WhatsApp’s official QR linking guide](https://faq.whatsapp.com/878854700132604/) for the phone-specific steps.
 
 ## Installation examples
 

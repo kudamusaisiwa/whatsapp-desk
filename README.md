@@ -8,6 +8,15 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 
 *WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
 
+## Feature highlights
+
+- **Live 24-hour response timer:** see hours, minutes and seconds remaining from the latest observed customer message, with clear open/closed status to help manage follow-ups.
+- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; WhatsApp Desk needs no Meta Business Manager or WhatsApp Cloud API setup.
+- **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
+- **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
+- **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
+- **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
+
 ## Install — no coding needed
 
 1. Download **WhatsApp-Desk.zip** from the [latest release](https://github.com/kudamusaisiwa/whatsapp-desk/releases/latest).
@@ -24,6 +33,10 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 Keep Developer mode enabled and keep the installed folder. Chrome 120 or later is required. Managed work browsers may require administrator approval. This is a manual installation with manual updates, rather than a Chrome Web Store listing.
 
 The ZIP includes a [visual setup guide](sharing/START-HERE.html) and [plain-text instructions](sharing/START-HERE.txt) covering setup, troubleshooting and updates. Chrome documents this installation flow in its [official extension guide](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world).
+
+### Link your WhatsApp Business account
+
+Open [WhatsApp Web](https://web.whatsapp.com). On your phone, open **WhatsApp Business → Linked devices → Link a device**, then scan the QR code shown on your computer. After linking, the extension works beside your chats. See [WhatsApp’s official QR linking guide](https://faq.whatsapp.com/878854700132604/) for the phone-specific steps.
 
 ### Installation examples
 
@@ -49,7 +62,7 @@ The supplied screenshot below shows the earlier MG Desk name with fictional samp
 - **AI replies:** grounded drafts use relevant business excerpts and up to 35 recent visible messages. Models must support Responses and structured output; picture understanding also requires image input.
 - **Pictures and screenshots:** include up to six loaded images per draft, resized to a maximum 2048 px edge. Receipts can be read and compared with approved payment details; images cannot independently verify payment or authenticity. Unclear or mismatched images require review.
 - **Client workspace:** local notes, stages, human takeover controls and a follow-up queue with review reminders and optional automatic sending.
-- **Response timer:** a countdown based on the latest observed incoming message. It is a workflow aid, not a connection to the WhatsApp Business Platform.
+- **24-hour response timer:** a live hours/minutes/seconds countdown from the latest observed incoming customer message. Business replies do not restart it. It is a workflow aid, not a connection to the WhatsApp Business Platform.
 - **Optional automation:** draft when messages arrive, automatically send eligible replies, and watch the newest visible inbox rows across chats. These controls start off. Review flags, human typing/takeover, changed conversations and uncertain sends pause automation.
 
 ## Privacy and keys
