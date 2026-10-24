@@ -17,6 +17,11 @@ WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **
 
 **[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
 
+For Chrome Web Store submission, use **WhatsApp-Desk-WebStore.zip** from the
+same release. It has `manifest.json` at the ZIP root, keeps automatic sending
+off, and uses the deployed seven-day trial and one-time $9.99 hosted Stripe
+Payment Link. Do not upload the manual-install ZIP to the Web Store.
+
 In the **Assets** section below, choose **WhatsApp-Desk.zip**. GitHub also shows **Source code (zip)** and **Source code (tar.gz)**: those are developer downloads and cannot be loaded straight into Chrome.
 
 ## Install in Chrome
