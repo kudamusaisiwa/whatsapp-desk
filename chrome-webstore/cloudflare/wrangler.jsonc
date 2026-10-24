@@ -11,7 +11,7 @@
   "vars": {
     "PUBLIC_BASE_URL": "https://whatsapp-desk-license-site.bakani.workers.dev",
     "STORE_URL": "https://chromewebstore.google.com/",
-    "STRIPE_PRICE_ID": "price_REPLACE_WITH_LIVE_999_USD_PRICE"
+    "STRIPE_PRICE_ID": "price_1UUDFlEdX4sDesjOvQyLTF42"
   },
   "d1_databases": [
     {

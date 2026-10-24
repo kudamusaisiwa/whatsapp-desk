@@ -1,7 +1,7 @@
 # Chrome Web Store listing copy
 
 Use this copy when creating the WhatsApp Desk listing. The privacy and terms
-URLs below are the planned Bakani Worker URLs.
+URLs below are served by the deployed Bakani Worker.
 
 ## Name
 

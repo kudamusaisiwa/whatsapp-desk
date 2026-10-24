@@ -25,11 +25,13 @@ there before deploying:
   redirect is safe to leave pointed at the Web Store home until publishing);
 - `STRIPE_PRICE_ID` — the live one-time USD Price for **$9.99**.
 
-Do not deploy with any `REPLACE_...` value still present. The public site is
-ready to publish once the deployed HTTPS URL, Web Store listing URL and live
-Stripe Price ID are known. The legal pages identify Kudakwashe Musasiwa as
-seller, link to the public GitHub support tracker, and state the 14-day refund
-window; review them before accepting payments.
+Do not deploy with any `REPLACE_...` value still present. The production
+deployment for this repository is currently
+`https://whatsapp-desk-license-site.bakani.workers.dev`; its Web Store install
+redirect remains pointed at the Web Store home until the listing has a final
+URL. The legal pages identify Kudakwashe Musasiwa as seller, link to the public
+GitHub support tracker, and state the 14-day refund window; review them before
+accepting payments.
 
 Apply the schema remotely:
 
