@@ -5,14 +5,30 @@
 *{box-sizing:border-box}body{margin:0;background:#f5f7f3;color:#183b32;font:17px/1.65 system-ui,sans-serif}main{max-width:850px;margin:auto;padding:64px 28px}header{padding-bottom:32px;border-bottom:1px solid #c8d7ce}small{letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#527364}h1{font-size:clamp(38px,7vw,64px);line-height:1.1;letter-spacing:-.05em;margin:16px 0}h2{font-size:26px;letter-spacing:-.025em;margin-top:0}section{margin-top:24px;background:white;border:1px solid #dce5dd;border-radius:14px;padding:28px}li{padding-left:6px;margin:10px 0}ol{padding-left:24px}a{color:#126a50}code{background:#edf4ef;padding:3px 7px;border-radius:5px;font-size:.9em}.note{border-left:3px solid #27825e;padding:4px 18px;color:#395f4e}footer{font-size:14px;color:#527364;margin-top:28px}@media print{main{padding:16px}section{break-inside:avoid}body{background:white}}
 </style></head><body><main>
 <header><small>Your business. Your key. Your control.</small><h1>WhatsApp Desk</h1><p>An AI reply assistant inside WhatsApp Web. Set it up in Chrome with your own OpenAI API key and business information.</p><p><strong>Start with drafts you review.</strong> Automatic sending is off when you first install.</p></header>
-<section><h2>1. Install in Chrome</h2><ol>
-<li><strong>Extract WhatsApp-Desk.zip.</strong> Use the named release download, rather than GitHub’s Source code (zip). On Windows, right-click → Extract All. On Mac, double-click.</li>
-<li>Move the extracted <strong>WhatsApp-Desk</strong> folder somewhere permanent, such as Documents. Keep it there.</li>
-<li>In Chrome’s address bar, type <code>chrome://extensions</code> and press Enter.</li>
-<li>Turn on <strong>Developer mode</strong> at the top right, then click <strong>Load unpacked</strong>.</li>
-<li>Select the <strong>WhatsApp-Desk folder containing manifest.json</strong>. Select the folder, not the ZIP. If there is an extra outer folder, open it to find the inner one.</li>
-<li>Open <a href="https://web.whatsapp.com">WhatsApp Web</a> and sign in. Refresh an existing WhatsApp tab. Your assistant appears on the right.</li>
-</ol><p class="note">Keep Developer mode on. No coding or terminal commands are needed. Requires desktop Chrome 120 or later; managed work browsers may need IT approval. The toolbar button opens or collapses the panel.</p></section>
+<section><h2>1. Install in Chrome — Mac &amp; Windows</h2>
+<p><a href="https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip"><strong>Download WhatsApp-Desk.zip</strong></a> from the release’s Assets section. GitHub’s <strong>Source code (zip)</strong> and <strong>Source code (tar.gz)</strong> downloads are for developers.</p>
+<ol>
+<li><strong>Extract the ZIP.</strong> On Mac, double-click it. On Windows, right-click → Extract All → Extract.</li>
+<li><strong>Open the extracted folder</strong> in Finder or File Explorer. Check that <code>manifest.json</code> is directly inside it. If you see another WhatsApp-Desk folder, open that inner folder.</li>
+</ol>
+<pre style="overflow:auto;background:#edf4ef;padding:18px;border-radius:8px;font-size:14px;line-height:1.6">WhatsApp-Desk/      ← select this folder
+    manifest.json
+    background.js
+    content.js
+    panel.html
+    START-HERE.html
+    assets/
+    icons/</pre>
+<ol start="3">
+<li>Move this <strong>WhatsApp-Desk</strong> folder somewhere permanent, such as Documents. Keep it there.</li>
+<li>Open Chrome. Type <code>chrome://extensions</code> in the address bar and press Enter.</li>
+<li>Turn on <strong>Developer mode</strong> at the top right.</li>
+<li>Click <strong>Load unpacked</strong>. Choose the folder you checked above, then click <strong>Select Folder</strong> on Windows or <strong>Select</strong> on Mac. Select the whole folder; do not select the ZIP or manifest.json itself.</li>
+<li>Check that a <strong>WhatsApp Desk</strong> card appears in the extension list and its enable switch is on. Keep Developer mode on.</li>
+<li>Open <a href="https://web.whatsapp.com">WhatsApp Web</a> and sign in, or refresh an existing WhatsApp tab. Your assistant appears on the right.</li>
+</ol>
+<p class="note"><strong>“Manifest file is missing or unreadable”?</strong> Click Cancel, then Load unpacked again. Choose the folder with <code>manifest.json</code> directly inside it. The source project folder cannot be loaded. If you built from source, choose its <code>dist</code> folder.</p>
+<p>No coding or terminal commands are needed for the release ZIP. Requires desktop Chrome 120 or later; managed work browsers may need IT approval. The toolbar button opens or collapses the panel.</p></section>
 <section><h2>2. Connect your own key</h2><ol>
 <li>Create your own secret key on the <a href="https://platform.openai.com/api-keys">OpenAI API keys page</a>. Set up API billing in your OpenAI account.</li>
 <li>In WhatsApp Desk, open <strong>Settings</strong>, paste your key and click <strong>Save key &amp; connect</strong>.</li>
