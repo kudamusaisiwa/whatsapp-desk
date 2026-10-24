@@ -3,7 +3,8 @@ Chrome extension • Version 0.3.1 • Bring your own OpenAI API key
 
 1. INSTALL IN CHROME
 
-1) Save WhatsApp-Desk.zip to your computer.
+1) Save the release download named WhatsApp-Desk.zip to your computer.
+   Do not use GitHub's Source code (zip) download.
 2) Extract the ZIP: on Windows, right-click > Extract All; on Mac, double-click.
 3) Move the extracted WhatsApp-Desk folder somewhere permanent, such as Documents.
    Keep this folder: Chrome loads the extension from it.
@@ -80,8 +81,10 @@ This is an independent assistant, not an official Meta/WhatsApp product.
 
 - No panel: check the extension is enabled at chrome://extensions, then
   refresh WhatsApp Web. Collapse/expand it with its Chrome toolbar button.
-- Cannot find manifest.json: fully extract the ZIP, then select the correct
-  inner WhatsApp-Desk folder using Load unpacked.
+- Cannot find manifest.json: fully extract WhatsApp-Desk.zip, then select the
+  inner folder with manifest.json directly inside it using Load unpacked.
+  If you are using the developer source project, build it first and select its
+  dist folder. The source project root cannot be loaded as an extension.
 - Key rejected: replace it with your own valid OpenAI API key in Settings.
 - Usage/rate limit: check your API billing, credits and project limits.
 - Model unavailable: refresh the model list and choose a compatible model.

@@ -15,6 +15,8 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 7. Set your business name and reply style, then add approved documents or notes in **Knowledge**.
 8. Open an individual chat and choose **Draft a reply**. Review the draft in WhatsApp before sending.
 
+**“Manifest file is missing or unreadable”?** Chrome needs the folder with `manifest.json` directly inside it. Download the release asset named **WhatsApp-Desk.zip**, rather than GitHub’s **Source code (zip)**. If you are loading this source project after building it, select its **`dist/`** folder; the source project root is not an installable extension. A packaged build is also available in **`releases/WhatsApp-Desk/`** after `npm run package:share`.
+
 Keep Developer mode enabled and keep the installed folder. Chrome 120 or later is required. Managed work browsers may require administrator approval. This is a manual installation with manual updates, rather than a Chrome Web Store listing.
 
 The ZIP includes a [visual setup guide](sharing/START-HERE.html) and [plain-text instructions](sharing/START-HERE.txt) covering setup, troubleshooting and updates. Chrome documents this installation flow in its [official extension guide](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world).
