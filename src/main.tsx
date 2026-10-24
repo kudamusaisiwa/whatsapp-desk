@@ -138,7 +138,7 @@ function LicenseBanner({
       </span>
       <div>
         <strong>
-          {locked ? "Your WhatsApp Desk trial has ended" : "WhatsApp Desk trial"}
+          {locked ? `Your ${APP_NAME} trial has ended` : `${APP_NAME} trial`}
         </strong>
         <small>
           {locked
@@ -246,7 +246,7 @@ function App() {
           </span>
           <div>
             <strong>
-              {BRAND_PREFIX} <span>Desk</span>
+              {BRAND_PREFIX} <span>AI for WhatsApp Web</span>
             </strong>
             <small>Your client companion</small>
           </div>
@@ -1439,7 +1439,7 @@ function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
           )}
         </span>
         <div>
-          <h2>{license.status === "paid" ? "License active" : "WhatsApp Desk trial"}</h2>
+          <h2>{license.status === "paid" ? "License active" : `${APP_NAME} trial`}</h2>
           <p>{licenseSummary(license)}</p>
         </div>
         <span className={`key-status ${license.status === "paid" ? "saved" : ""}`}>
@@ -1452,7 +1452,7 @@ function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
           <p className="license-copy">
             The one-time unlock is <strong>$9.99 USD</strong>. Stripe handles
             payment on its hosted checkout page. Your OpenAI key remains your
-            own and is never sent to Stripe or WhatsApp Desk.
+            own and is never sent to Stripe or {APP_NAME}.
           </p>
           {license.status === "unconfigured" ? (
             <p className="inline-error" role="alert">

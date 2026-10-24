@@ -1,4 +1,4 @@
-# Contributing to WhatsApp Desk
+# Contributing to Desk AI for WhatsApp Web
 
 Use Node.js 22.12 or later. Install dependencies with `npm ci`, make focused changes, and run `npm run check` before opening a pull request. Describe the behavior changed and how you checked it.
 

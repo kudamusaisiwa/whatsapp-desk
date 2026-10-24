@@ -1,17 +1,17 @@
-# WhatsApp Desk
+# Desk AI for WhatsApp Web
 
 An open-source Chrome extension that puts business knowledge, AI reply drafts and follow-ups beside WhatsApp Web. Built by **Kudakwashe Musasiwa**, the initial author. Licensed under the [MIT License](LICENSE).
 
 Bring your own **OpenAI API key** and business information. No API key, customer data or business knowledge is supplied. Automatic drafting and sending are off by default.
 
-![WhatsApp Desk preview with a fictional customer conversation and reply assistant](docs/images/whatsapp-desk-preview.png)
+![Desk AI for WhatsApp Web preview with a fictional customer conversation and reply assistant](docs/images/whatsapp-desk-preview.png)
 
-*WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
+*Desk AI for WhatsApp Web design preview with fictional sample data. No live customer chats or API key are shown.*
 
 ## Feature highlights
 
 - **Live 24-hour response timer:** see hours, minutes and seconds remaining from the latest observed customer message, with clear open/closed status to help manage follow-ups.
-- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; WhatsApp Desk needs no Meta Business Manager or WhatsApp Cloud API setup.
+- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
 - **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
 - **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
 - **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
@@ -23,7 +23,7 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 2. Unzip it and keep the extracted **WhatsApp Desk** folder somewhere permanent.
 3. In desktop Chrome, open `chrome://extensions` and turn on **Developer mode**.
 4. Click **Load unpacked** and select **`WhatsApp Desk/releases/WhatsApp-Desk`** inside the unzipped download.
-5. Open or refresh [WhatsApp Web](https://web.whatsapp.com). WhatsApp Desk appears on the right.
+5. Open or refresh [WhatsApp Web](https://web.whatsapp.com). Desk AI appears on the right.
 6. Open **Settings**, enter your own OpenAI API key, and choose **Save key & connect**. Select a compatible model available to your project.
 7. Set your business name and reply style, then add approved documents or notes in **Knowledge**.
 8. Open an individual chat and choose **Draft a reply**. Review the draft in WhatsApp before sending.
@@ -40,7 +40,7 @@ Open [WhatsApp Web](https://web.whatsapp.com). On your phone, open **WhatsApp Bu
 
 ### Installation examples
 
-These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome://extensions` and use the **Developer mode** and **Load unpacked** controls shown below.
+These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome://extensions` and use the **Developer mode** and **Load unpacked** controls shown below. The extracted release folder keeps its existing `WhatsApp Desk` path for easy installation.
 
 **1. Turn on Developer mode.**
 

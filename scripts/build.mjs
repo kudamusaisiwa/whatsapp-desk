@@ -72,8 +72,8 @@ await build({
 if (share || webstore) {
   const path = `${outdir}/manifest.json`;
   const manifest = JSON.parse(readFileSync(path, "utf8"));
-  manifest.name = "WhatsApp Desk";
-  manifest.action.default_title = "Open WhatsApp Desk";
+  manifest.name = "Desk AI for WhatsApp Web";
+  manifest.action.default_title = "Open Desk AI for WhatsApp Web";
   if (webstore) {
     const origin = new URL(licenseApi).origin;
     manifest.host_permissions = [

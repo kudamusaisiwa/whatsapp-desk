@@ -3,6 +3,7 @@ import {
   LICENSE_API_BASE_URL,
   STORE_RELEASE,
 } from "./release";
+import { APP_NAME } from "./product";
 
 const INSTALLATION_KEY = "whatsappDeskInstallationId";
 const LICENSE_KEY = "whatsappDeskLicense";
@@ -180,7 +181,7 @@ export async function assertLicenseAccess() {
   const state = await getLicenseState();
   if (hasLicenseAccess(state)) return state;
   if (state.status === "expired")
-    throw new Error("Your 7-day trial has ended. Unlock WhatsApp Desk for $9.99.");
+    throw new Error(`Your 7-day trial has ended. Unlock ${APP_NAME} for $9.99.`);
   if (state.status === "unconfigured")
     throw new Error("Store licensing is not configured for this build.");
   throw new Error("Connect to the licensing service before drafting replies.");

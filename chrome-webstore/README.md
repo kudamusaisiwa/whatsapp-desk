@@ -1,4 +1,4 @@
-# WhatsApp Desk — Chrome Web Store edition
+# Desk AI for WhatsApp Web — Chrome Web Store edition
 
 This folder documents the paid Web Store build. The existing `releases/WhatsApp-Desk.zip`
 manual-install release is unchanged.
@@ -8,7 +8,7 @@ manual-install release is unchanged.
 - Seven-day trial issued by the licensing service.
 - One-time **$9.99 USD** unlock through Stripe Checkout.
 - The customer supplies their own OpenAI API key. No OpenAI key is included,
-  shared or billed by WhatsApp Desk.
+  shared or billed by Desk AI for WhatsApp Web.
 - The Worker uses a hosted Stripe Payment Link, so no Stripe API secret is
   needed in the extension or licensing service. The webhook signing secret and
   payment records stay on the licensing service.
@@ -101,7 +101,7 @@ client-side Stripe secret or a local “I paid” flag.
 
 ## Store review notes
 
-The store listing should state that WhatsApp Desk is an independent project,
+The store listing should state that Desk AI for WhatsApp Web is an independent project,
 not affiliated with Meta or WhatsApp, and that the extension uses WhatsApp
 Web's own QR linking flow. The store build should require a human confirmation
 for every message send. See the repository's Chrome Web Store checklist before

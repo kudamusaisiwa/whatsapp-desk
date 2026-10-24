@@ -1,5 +1,5 @@
-export const APP_NAME = "WhatsApp Desk";
-export const BRAND_PREFIX = "WhatsApp";
+export const APP_NAME = "Desk AI for WhatsApp Web";
+export const BRAND_PREFIX = "Desk";
 export const DEFAULT_BUSINESS_NAME = "Your business";
 export const DEFAULT_BUSINESS_INSTRUCTIONS =
   "Be warm, professional and concise. Answer directly using the business knowledge supplied by the owner. Use the customer's language, keep WhatsApp replies well spaced, and ask one useful question at a time. Never invent prices, payment details, policies or guarantees. Flag missing information for human review.";

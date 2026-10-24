@@ -1,13 +1,13 @@
-WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **Kudakwashe Musasiwa** and licensed under **MIT**.
+Desk AI for WhatsApp Web is an open-source Chrome extension, created by **Kudakwashe Musasiwa** and licensed under **MIT**.
 
-![WhatsApp Desk preview with a fictional customer conversation and reply assistant](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/whatsapp-desk-preview.png)
+![Desk AI for WhatsApp Web preview with a fictional customer conversation and reply assistant](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/whatsapp-desk-preview.png)
 
-*WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
+*Desk AI for WhatsApp Web design preview with fictional sample data. No live customer chats or API key are shown.*
 
 ## Feature highlights
 
 - **Live 24-hour response timer:** see hours, minutes and seconds remaining from the latest observed customer message, with clear open/closed status to help manage follow-ups.
-- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; WhatsApp Desk needs no Meta Business Manager or WhatsApp Cloud API setup.
+- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
 - **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
 - **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
 - **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
@@ -15,7 +15,7 @@ WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **
 
 ## Download this file
 
-**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.2/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
+**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.3/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
 
 For Chrome Web Store submission, use **WhatsApp-Desk-WebStore.zip** from the
 same release. It has `manifest.json` at the ZIP root, keeps automatic sending
@@ -67,14 +67,14 @@ The supplied screenshot below shows the earlier MG Desk name with fictional samp
 ## Connect your key and business
 
 1. Create your own key on the **[OpenAI API keys page](https://platform.openai.com/api-keys)** and set up API billing. API usage is charged separately from a ChatGPT subscription.
-2. In WhatsApp Desk, open **Settings**, paste your key and click **Save key & connect**.
+2. In Desk AI for WhatsApp Web, open **Settings**, paste your key and click **Save key & connect**.
 3. Select a model available to your project that supports Responses and structured output; images also require image input. Enter your business name, set the date order to match WhatsApp and click **Save workspace settings**.
 4. In **Knowledge**, upload your approved business documents or write a note about your services, prices, hours and policies.
 5. Open an individual conversation and choose **Draft a reply**. Review or edit it in the WhatsApp message box before sending.
 
 The extension starts with **no key or business knowledge**. **Auto-send, Draft as messages arrive and Reply across all chats start off.**
 
-The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code is v0.3.2.
+The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code is v0.3.3 and the Chrome name is **Desk AI for WhatsApp Web**.
 
 ## Included and privacy
 

@@ -1,18 +1,18 @@
-WHATSAPP DESK — START HERE
-Chrome extension • Version 0.3.2 • Bring your own OpenAI API key
+DESK AI FOR WHATSAPP WEB — START HERE
+Chrome extension • Version 0.3.3 • Bring your own OpenAI API key
 
 1. INSTALL IN CHROME
 
 1) Download WhatsApp-Desk.zip and unzip it:
-   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.2/WhatsApp-Desk.zip
-2) Keep the extracted WhatsApp Desk folder somewhere permanent, such as Documents.
+   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.3/WhatsApp-Desk.zip
+2) Keep the extracted WhatsApp Desk folder somewhere permanent, such as Documents. The extension is named Desk AI for WhatsApp Web inside Chrome.
 3) Open chrome://extensions in Chrome and turn on Developer mode.
 4) Click Load unpacked and select this folder inside the unzipped download:
 
    WhatsApp Desk/releases/WhatsApp-Desk
 
    Open WhatsApp Desk, then releases, then select WhatsApp-Desk.
-5) Open or refresh https://web.whatsapp.com. WhatsApp Desk appears on the right.
+5) Open or refresh https://web.whatsapp.com. Desk AI for WhatsApp Web appears on the right.
 
 On Mac, double-click the ZIP to unzip it. On Windows, right-click > Extract All.
 Use the named WhatsApp-Desk.zip release download; Source code downloads are for developers.
@@ -27,7 +27,7 @@ Load unpacked again, then select WhatsApp Desk/releases/WhatsApp-Desk.
 1) Sign in to https://platform.openai.com/api-keys and create your own secret key.
 2) Make sure API billing is set up in your OpenAI account. API usage is charged
    to your account separately from a ChatGPT subscription.
-3) In WhatsApp Desk, open Settings. Paste the key under OpenAI connection and
+3) In Desk AI for WhatsApp Web, open Settings. Paste the key under OpenAI connection and
    click Save key & connect.
 4) Refresh the model list. Choose a model available to your project that
    supports Responses and structured output (and image input for pictures).
@@ -91,7 +91,7 @@ This is an independent assistant, not an official Meta/WhatsApp product.
 
 UPDATING
 Keep the same installed folder and replace its files with the new version.
-At chrome://extensions, click Reload on WhatsApp Desk, then refresh WhatsApp.
+At chrome://extensions, click Reload on Desk AI for WhatsApp Web, then refresh WhatsApp.
 Avoid removing/reinstalling if you want to retain the extension's local data.
 
 OFFICIAL REFERENCES

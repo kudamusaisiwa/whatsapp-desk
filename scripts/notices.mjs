@@ -5,7 +5,7 @@ import { join } from "node:path";
 export function writeNotices(destination) {
   const result = spawnSync("npm", ["ls", "--parseable", "--omit=dev", "--all"], { encoding: "utf8" });
   if (result.status !== 0) throw new Error("Could not inventory runtime dependency licenses.");
-  const sections = ["WHATSAPP DESK — THIRD-PARTY NOTICES\n\nThe application is MIT licensed. Bundled dependencies and fonts retain their own licenses below. This inventory includes installed runtime dependencies, some of which may be tree-shaken from the build."];
+  const sections = ["DESK AI FOR WHATSAPP WEB — THIRD-PARTY NOTICES\n\nThe application is MIT licensed. Bundled dependencies and fonts retain their own licenses below. This inventory includes installed runtime dependencies, some of which may be tree-shaken from the build."];
   const seen = new Set();
   for (const path of result.stdout.trim().split("\n").slice(1)) {
     const pkg = JSON.parse(readFileSync(join(path, "package.json"), "utf8"));

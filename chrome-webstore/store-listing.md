@@ -1,11 +1,11 @@
 # Chrome Web Store listing copy
 
-Use this copy when creating the WhatsApp Desk listing. The privacy and terms
+Use this copy when creating the Desk AI for WhatsApp Web listing. The privacy and terms
 URLs below are served by the deployed Bakani Worker.
 
 ## Name
 
-WhatsApp Desk
+Desk AI for WhatsApp Web
 
 ## Short description
 
@@ -13,7 +13,7 @@ Business knowledge, AI reply drafts, follow-ups and a live 24-hour response time
 
 ## Detailed description
 
-WhatsApp Desk keeps the useful parts of a customer-support desk beside WhatsApp
+Desk AI for WhatsApp Web keeps the useful parts of a customer-support desk beside WhatsApp
 Web. Add your own services, prices, policies and FAQs, then draft thoughtful
 replies grounded in the information you approve.
 
@@ -27,13 +27,13 @@ Features:
 - Human takeover controls and manual review before sending.
 - A seven-day trial, then a one-time $9.99 USD unlock through Stripe Checkout.
 
-Bring your own OpenAI API key. WhatsApp Desk does not include or resell OpenAI
+Bring your own OpenAI API key. Desk AI for WhatsApp Web does not include or resell OpenAI
 credits. The key and local workspace stay in your Chrome profile; selected
 conversation content, business excerpts and images are sent directly to
 OpenAI only when you request a draft. The Chrome Web Store edition keeps
 automatic sending disabled and requires you to review and click Send.
 
-WhatsApp Desk is an independent open-source project by Kudakwashe Musasiwa. It
+Desk AI for WhatsApp Web is an independent open-source project by Kudakwashe Musasiwa. It
 is not affiliated with, endorsed by, or produced by Meta or WhatsApp.
 
 ## Privacy practices declaration

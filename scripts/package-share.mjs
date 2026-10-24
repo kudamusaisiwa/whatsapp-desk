@@ -46,7 +46,7 @@ function inspect(dir) {
 }
 inspect(root);
 const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
-if (manifest.name !== "WhatsApp Desk" || manifest.key || manifest.update_url)
+if (manifest.name !== "Desk AI for WhatsApp Web" || manifest.key || manifest.update_url)
   throw new Error("Unexpected shared manifest identity or update configuration.");
 run("gitleaks", ["dir", root, "--redact", "--no-banner", "--ignore-gitleaks-allow", "--report-format", "json", "--report-path", join(audit, "release.json")]);
 rmSync(pending, { force: true });

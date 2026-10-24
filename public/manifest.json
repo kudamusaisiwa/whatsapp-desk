@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "WhatsApp Desk",
-  "version": "0.3.2",
+  "name": "Desk AI for WhatsApp Web",
+  "version": "0.3.3",
   "description": "Business knowledge, AI reply drafts, client follow-ups and a live response-window timer inside WhatsApp Web.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -18,7 +18,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open WhatsApp Desk",
+    "default_title": "Open Desk AI for WhatsApp Web",
     "default_icon": {
       "16": "icons/16.png",
       "48": "icons/48.png",

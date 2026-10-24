@@ -68,7 +68,7 @@ function inspect(dir) {
 inspect(root);
 
 const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
-if (manifest.name !== "WhatsApp Desk" || manifest.key || manifest.update_url)
+if (manifest.name !== "Desk AI for WhatsApp Web" || manifest.key || manifest.update_url)
   throw new Error("Unexpected Web Store manifest identity or update configuration.");
 if (!manifest.host_permissions?.some((value) => String(value).startsWith(parsed.origin)))
   throw new Error("The Web Store manifest is missing the configured license API host.");

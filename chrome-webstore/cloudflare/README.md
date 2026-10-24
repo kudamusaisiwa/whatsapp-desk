@@ -1,6 +1,6 @@
-# WhatsApp Desk Cloudflare site
+# Desk AI for WhatsApp Web Cloudflare site
 
-This Worker serves the WhatsApp Desk landing page, the privacy/terms pages,
+This Worker serves the Desk AI for WhatsApp Web landing page, the privacy/terms pages,
 and the small licensing API used by the Chrome Web Store build. Workers Static
 Assets serves `public/`; D1 stores installation and verified-payment state.
 Stripe Checkout is hosted by a Payment Link. The Worker only receives signed
