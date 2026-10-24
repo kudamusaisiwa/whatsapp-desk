@@ -1,5 +1,9 @@
 WhatsApp Desk is an open-source Chrome extension for WhatsApp Web, created by **Kudakwashe Musasiwa** and licensed under **MIT**.
 
+![WhatsApp Desk preview with a fictional customer conversation and reply assistant](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/whatsapp-desk-preview.png)
+
+*WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
+
 ## Download this file
 
 **[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.1/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
@@ -35,6 +39,12 @@ These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome:
 **2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
 
 ![Click Load unpacked in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/load-unpacked.png)
+
+### Earlier design example
+
+The supplied screenshot below shows the earlier MG Desk name with fictional sample data.
+
+![Earlier MG Desk design preview supplied as an example](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/mg-desk-preview-example.png)
 
 ## Connect your key and business
 

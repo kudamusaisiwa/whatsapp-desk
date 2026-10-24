@@ -4,6 +4,10 @@ An open-source Chrome extension that puts business knowledge, AI reply drafts an
 
 Bring your own **OpenAI API key** and business information. No API key, customer data or business knowledge is supplied. Automatic drafting and sending are off by default.
 
+![WhatsApp Desk preview with a fictional customer conversation and reply assistant](docs/images/whatsapp-desk-preview.png)
+
+*WhatsApp Desk design preview with fictional sample data. No live customer chats or API key are shown.*
+
 ## Install — no coding needed
 
 1. Download **WhatsApp-Desk.zip** from the [latest release](https://github.com/kudamusaisiwa/whatsapp-desk/releases/latest).
@@ -32,6 +36,12 @@ These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome:
 **2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
 
 ![Click Load unpacked in the extensions page](docs/images/load-unpacked.png)
+
+### Earlier design example
+
+The supplied screenshot below shows the earlier MG Desk name with fictional sample data.
+
+![Earlier MG Desk design preview supplied as an example](docs/images/mg-desk-preview-example.png)
 
 ## What it does
 
