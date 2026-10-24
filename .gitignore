@@ -1,4 +1,6 @@
 node_modules/
+.wrangler/
+.dev.vars
 dist/
 *.zip
 .DS_Store

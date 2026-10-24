@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "node scripts/build.mjs",
     "package:share": "node scripts/package-share.mjs",
+    "package:webstore": "node scripts/package-webstore.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
     "check": "npm run typecheck && npm test && npm run build"
@@ -36,7 +37,7 @@
     "vite": "^8.3.5"
   },
   "private": true,
-  "homepage": "https://github.com/kudamusaisiwa/whatsapp-desk",
+  "homepage": "https://github.com/kudamusasiwa/whatsapp-desk",
   "repository": {
     "type": "git",
     "url": "https://github.com/kudamusaisiwa/whatsapp-desk.git"

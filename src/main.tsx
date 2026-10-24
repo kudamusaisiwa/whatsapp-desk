@@ -42,9 +42,11 @@ import {
   type Client,
   type DeskState,
   type FollowUp,
+  type LicenseState,
   type Settings,
   type Stage,
 } from "./types";
+import { STORE_RELEASE } from "./release";
 import { windowState } from "./core";
 import { replyCountdown } from "./pacing";
 import { readKnowledge } from "./files";
@@ -105,6 +107,49 @@ function Toggle({
     >
       <span />
     </button>
+  );
+}
+function licenseSummary(license: LicenseState, now = Date.now()) {
+  if (license.status === "paid") return "Unlocked";
+  if (license.status === "trial" && license.trialEndsAt) {
+    const days = Math.max(0, Math.ceil((license.trialEndsAt - now) / 86400000));
+    return `${days} day${days === 1 ? "" : "s"} left in your trial`;
+  }
+  if (license.status === "expired") return "Trial ended";
+  if (license.status === "unconfigured") return "Licensing not configured";
+  return "Checking license";
+}
+function LicenseBanner({
+  license,
+  now,
+  openSettings,
+}: {
+  license: LicenseState;
+  now: number;
+  openSettings: () => void;
+}) {
+  if (!STORE_RELEASE || license.status === "bypass" || license.status === "paid")
+    return null;
+  const locked = license.status === "expired";
+  return (
+    <div className={`license-banner ${locked ? "locked" : ""}`} role="status">
+      <span className="license-banner-icon">
+        {locked ? <LockKeyhole size={15} /> : <Clock3 size={15} />}
+      </span>
+      <div>
+        <strong>
+          {locked ? "Your WhatsApp Desk trial has ended" : "WhatsApp Desk trial"}
+        </strong>
+        <small>
+          {locked
+            ? "Unlock the assistant for a one-time $9.99 payment."
+            : `${licenseSummary(license, now)} · bring your own OpenAI key.`}
+        </small>
+      </div>
+      <button className="text-button" onClick={openSettings}>
+        {locked ? "Unlock" : "Manage"} <ArrowRight size={13} />
+      </button>
+    </div>
   );
 }
 function App() {
@@ -244,6 +289,11 @@ function App() {
           ))}
         </nav>
       </div>
+      <LicenseBanner
+        license={desk.license}
+        now={clock}
+        openSettings={() => setTab("settings")}
+      />
       <main className="desk-scroll">
         {tab === "assistant" && (
           <>
@@ -550,7 +600,9 @@ function App() {
                     <div>
                       <div className="automation-title">
                         <Send size={15} />
-                        <strong>Auto-send</strong>
+                        <strong>
+                          {STORE_RELEASE ? "Manual send" : "Auto-send"}
+                        </strong>
                         <span
                           className={
                             desk.settings.autoSend
@@ -558,19 +610,30 @@ function App() {
                               : "badge"
                           }
                         >
-                          {desk.settings.autoSend ? "ON" : "OFF"}
+                          {STORE_RELEASE
+                            ? "REQUIRED"
+                            : desk.settings.autoSend
+                              ? "ON"
+                              : "OFF"}
                         </span>
                       </div>
                       <p>
-                        {desk.settings.autoSend
+                        {STORE_RELEASE
+                          ? "Review every draft in WhatsApp and click Send yourself."
+                          : desk.settings.autoSend
                           ? "Replies are paced by length. Longer answers may arrive in two messages."
                           : "Drafts stay in the chat box for a human to send."}
                       </p>
                     </div>
                     <Toggle
-                      label="Auto-send replies"
+                      label={
+                        STORE_RELEASE
+                          ? "Manual sending is required"
+                          : "Auto-send replies"
+                      }
                       checked={desk.settings.autoSend}
                       onChange={(v) => changeSettings({ autoSend: v })}
+                      disabled={STORE_RELEASE}
                     />
                   </div>
                   <div className="auto-draft-row">
@@ -1347,6 +1410,94 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
     </>
   );
 }
+function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const license = desk.license;
+  if (!STORE_RELEASE || license.status === "bypass") return null;
+  async function checkout() {
+    setBusy(true);
+    try {
+      await act(
+        "START_CHECKOUT",
+        { email },
+        "Stripe Checkout opened in a new tab.",
+      );
+    } catch {
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="form-card license-card">
+      <div className="card-heading">
+        <span className="tiny-icon">
+          {license.status === "paid" ? (
+            <Check size={18} />
+          ) : (
+            <Clock3 size={18} />
+          )}
+        </span>
+        <div>
+          <h2>{license.status === "paid" ? "License active" : "WhatsApp Desk trial"}</h2>
+          <p>{licenseSummary(license)}</p>
+        </div>
+        <span className={`key-status ${license.status === "paid" ? "saved" : ""}`}>
+          <i />
+          {license.status === "paid" ? "Unlocked" : "7-day trial"}
+        </span>
+      </div>
+      {license.status !== "paid" && (
+        <>
+          <p className="license-copy">
+            The one-time unlock is <strong>$9.99 USD</strong>. Stripe handles
+            payment on its hosted checkout page. Your OpenAI key remains your
+            own and is never sent to Stripe or WhatsApp Desk.
+          </p>
+          {license.status === "unconfigured" ? (
+            <p className="inline-error" role="alert">
+              Licensing is not configured for this build.
+            </p>
+          ) : (
+            <>
+              <label>
+                Email for your Stripe receipt (optional)
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </label>
+              <button
+                type="button"
+                className="primary-button full-button"
+                onClick={() => void checkout()}
+                disabled={busy}
+              >
+                {busy ? <LoaderCircle size={16} className="spin" /> : <LockKeyhole size={16} />}
+                Unlock for $9.99
+              </button>
+              <p className="field-hint">
+                Already paid? Return to this extension after checkout and
+                refresh the license status below.
+              </p>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => void act("REFRESH_LICENSE", {}, "License status refreshed.")}
+                disabled={busy}
+              >
+                <RefreshCw size={13} /> Refresh license status
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
   const [form, setForm] = useState({ ...desk.settings });
   const [key, setKey] = useState("");
@@ -1398,6 +1549,7 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
         </h1>
         <p>Your AI connection, your business voice, your control.</p>
       </div>
+      <LicenseCard desk={desk} act={act} />
       <section className="form-card key-card">
         <div className="card-heading">
           <span className="tiny-icon">

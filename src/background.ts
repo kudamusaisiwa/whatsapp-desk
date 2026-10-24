@@ -29,6 +29,13 @@ import {
   replyDelay,
   replyParts,
 } from "./pacing";
+import {
+  assertLicenseAccess,
+  getLicenseState,
+  hasLicenseAccess,
+  startCheckout,
+} from "./license";
+import { STORE_RELEASE } from "./release";
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 function mutate<T>(fn: () => Promise<T>): Promise<T> {
@@ -58,6 +65,9 @@ const ready = (async () => {
     settings.allChats = true;
   if (settings.businessInstructions === LEGACY_BUSINESS_INSTRUCTIONS)
     settings.businessInstructions = DEFAULT_SETTINGS.businessInstructions;
+  // The Chrome Web Store edition must keep sending human-confirmed. Drafting
+  // remains available, but automatic sends are disabled for policy safety.
+  if (STORE_RELEASE) settings.autoSend = false;
   await chrome.storage.local.set({
     settings,
   });
@@ -189,6 +199,10 @@ async function queueReply(context: ChatContext, tabId: number) {
 async function runPending(tabId: number) {
   const job = (await pendingReplies())[tabId];
   if (!job) return;
+  if (!hasLicenseAccess(await getLicenseState())) {
+    await cancelPending(tabId, job);
+    return;
+  }
   if (Date.now() - job.dueAt > 120000) {
     await cancelPending(tabId, job);
     return;
@@ -748,6 +762,7 @@ async function ensureAlarm() {
 }
 async function sweep() {
   await ready;
+  const license = await getLicenseState();
   const due = await mutate(async () => {
     const d = await data();
     const due = d.followUps.filter(
@@ -771,7 +786,13 @@ async function sweep() {
   });
   for (const item of due) {
     const d = await data();
-    if (item.mode === "automatic" && d.settings.autoSend) {
+    if (
+      license.status !== "expired" &&
+      license.status !== "offline" &&
+      license.status !== "unconfigured" &&
+      item.mode === "automatic" &&
+      d.settings.autoSend
+    ) {
       const tabs = await chrome.tabs.query({
         url: "https://web.whatsapp.com/*",
       });
@@ -1050,6 +1071,11 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
     return {};
   }
   if (m.type === "AUTHORIZE_SEND" && content) {
+    if (STORE_RELEASE)
+      throw new Error(
+        "The Chrome Web Store edition requires a human to review and send replies.",
+      );
+    await assertLicenseAccess();
     if (m.inboxToken) await assertInboxControl(sender.tab!.id!, m.inboxToken);
     const ctx = await freshContext(sender.tab!.id!);
     const d = await data();
@@ -1104,6 +1130,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
         s.pendingReplies as Record<string, PendingReply> | undefined
       )?.[tabId];
       const inbox = (s[`inbox:${tabId}`] as InboxState) ?? null;
+      const license = await getLicenseState();
       const queued = inbox?.items.find(
         (i) =>
           i.status === "waiting" &&
@@ -1153,7 +1180,18 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
         activity: (s[`activity:${tabId}`] as string) ?? "",
         replyTiming: visibleTiming,
         inbox,
+        license,
       } satisfies DeskState;
+    }
+    case "START_CHECKOUT": {
+      const result = await startCheckout(
+        typeof m.email === "string" ? m.email : undefined,
+      );
+      await chrome.tabs.create({ url: result.url });
+      return result;
+    }
+    case "REFRESH_LICENSE": {
+      return await getLicenseState(true);
     }
     case "SAVE_SETTINGS": {
       await mutate(async () => {
@@ -1169,7 +1207,11 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
           ).slice(0, 6000),
           model: String(p.model ?? d.settings.model).slice(0, 150),
           autoSend:
-            typeof p.autoSend === "boolean" ? p.autoSend : d.settings.autoSend,
+            STORE_RELEASE
+              ? false
+              : typeof p.autoSend === "boolean"
+                ? p.autoSend
+                : d.settings.autoSend,
           autoDraft:
             typeof p.autoDraft === "boolean"
               ? p.autoDraft
@@ -1305,6 +1347,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
       return {};
     }
     case "GENERATE": {
+      await assertLicenseAccess();
       await cancelPending(tabId);
       try {
         return await generate(tabId);

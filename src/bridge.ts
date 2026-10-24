@@ -68,6 +68,12 @@ const sample: DeskState = {
   activity: "",
   replyTiming: null,
   inbox: null,
+  license: {
+    status: "bypass",
+    installationId: null,
+    trialEndsAt: null,
+    checkedAt: null,
+  },
 };
 function demoState(): DeskState {
   try {

@@ -117,6 +117,15 @@ Outputs:
 - `releases/WhatsApp-Desk.zip.sha256` — integrity checksum.
 - `releases/WhatsApp-Desk-audit.json` — scan summary and file inventory.
 
+## Chrome Web Store edition
+
+The paid Chrome Web Store build is documented separately in
+[`chrome-webstore/README.md`](chrome-webstore/README.md). It adds a
+server-issued seven-day trial and a one-time $9.99 unlock while keeping the
+OpenAI key with each user. The companion Cloudflare Worker serves the public
+landing page, privacy pages and licensing API; Stripe secrets stay
+server-side. Build the upload ZIP only after the Worker has a real HTTPS URL.
+
 Automated secret scanning reduces risk; it cannot prove that every possible credential is absent. Review your own changes before publishing. CI scans repository history and runs the checks on pushes and pull requests.
 
 ## Contributing and license

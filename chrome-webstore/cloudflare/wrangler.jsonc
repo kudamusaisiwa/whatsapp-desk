@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "whatsapp-desk-license-site",
+  "account_id": "199d0cb9ad64de779f57584309be40a0",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-24",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "PUBLIC_BASE_URL": "https://whatsapp-desk-license-site.bakani.workers.dev",
+    "STORE_URL": "https://chromewebstore.google.com/",
+    "STRIPE_PRICE_ID": "price_REPLACE_WITH_LIVE_999_USD_PRICE"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whatsapp-desk-licenses",
+      "database_id": "efd0823a-f938-49c5-bea0-f7c6f47c23a9",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

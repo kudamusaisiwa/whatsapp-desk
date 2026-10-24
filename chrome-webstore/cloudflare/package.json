@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-desk-license-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "d1:migrate:local": "wrangler d1 migrations apply whatsapp-desk-licenses --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply whatsapp-desk-licenses --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261024.1",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.0.0"
+  }
+}

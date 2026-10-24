@@ -93,6 +93,20 @@ export interface InboxState {
   updatedAt: number;
   observedChats: number;
 }
+export type LicenseStatus =
+  | "bypass"
+  | "trial"
+  | "paid"
+  | "expired"
+  | "unconfigured"
+  | "offline";
+export interface LicenseState {
+  status: LicenseStatus;
+  installationId: string | null;
+  trialEndsAt: number | null;
+  checkedAt: number | null;
+  message?: string;
+}
 export interface DeskState {
   settings: Settings;
   knowledge: Knowledge[];
@@ -105,6 +119,7 @@ export interface DeskState {
   activity: string;
   replyTiming: ReplyTiming | null;
   inbox: InboxState | null;
+  license: LicenseState;
 }
 export interface PendingReply {
   tabId: number;
