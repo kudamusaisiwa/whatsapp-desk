@@ -10,12 +10,15 @@ Desk AI for WhatsApp Web is an open-source Chrome extension, created by **Kudakw
 - **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
 - **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
 - **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
+- **Call and meeting notes:** record the audio of WhatsApp voice and video calls, transcribe with Whisper, then send the customer an editable call summary — a thank-you, what was discussed, agreed next steps and anything still to confirm. Name the company and customer speakers for better transcripts and attribution.
+- **Voice replies with AI polish:** dictate WhatsApp replies with speech-to-text, then polish the wording — professional, shorter, clearer or summarized — before pressing Send.
+- **Compact desk layout:** the composer, client details, automation chips, queue and call notes are designed to stay on screen without scrolling.
 - **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
 - **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
 
 ## Download this file
 
-**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.3/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
+**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.4.0/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
 
 For Chrome Web Store submission, use **WhatsApp-Desk-WebStore.zip** from the
 same release. It has `manifest.json` at the ZIP root, keeps automatic sending

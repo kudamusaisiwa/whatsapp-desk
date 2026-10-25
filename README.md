@@ -14,6 +14,9 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 - **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
 - **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
 - **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
+- **Call and meeting notes:** record the audio of WhatsApp voice and video calls, transcribe with Whisper, then send the customer an editable call summary — a thank-you, what was discussed, agreed next steps and anything still to confirm. Name the company and customer speakers for better transcripts and attribution.
+- **Voice replies with AI polish:** dictate WhatsApp replies with speech-to-text, then polish the wording — professional, shorter, clearer or summarized — before pressing Send.
+- **Compact desk layout:** the composer, client details, automation chips, queue and call notes are designed to stay on screen without scrolling.
 - **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
 - **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
 
@@ -55,6 +58,14 @@ These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome:
 The supplied screenshot below shows the earlier MG Desk name with fictional sample data.
 
 ![Earlier MG Desk design preview supplied as an example](docs/images/mg-desk-preview-example.png)
+
+### Latest design
+
+The same panel design ships in Desk AI; these captures are shown in the MG Desk deployment.
+
+| Assistant | Settings | Follow-ups |
+|---|---|---|
+| ![Assistant tab with client bar, automation chips and collapsed call notes](docs/images/mg-desk-assistant.png) | ![Settings tab with collapsible sections](docs/images/mg-desk-settings.png) | ![Follow-ups tab with schedule action](docs/images/mg-desk-followups.png) |
 
 ## What it does
 
@@ -133,6 +144,10 @@ landing page, privacy pages and licensing API; Stripe secrets stay
 server-side. Build the upload ZIP only after the Worker has a real HTTPS URL.
 
 Automated secret scanning reduces risk; it cannot prove that every possible credential is absent. Review your own changes before publishing. CI scans repository history and runs the checks on pushes and pull requests.
+
+## Roadmap
+
+- On-device / local AI transcription and drafting, to reduce per-message OpenAI API costs for users.
 
 ## Contributing and license
 

@@ -9,7 +9,7 @@ Desk AI for WhatsApp Web
 
 ## Short description
 
-Business knowledge, AI reply drafts, follow-ups and a live 24-hour response timer inside WhatsApp Web.
+Business knowledge, AI reply drafts, call notes, follow-ups and a live 24-hour response timer inside WhatsApp Web.
 
 ## Detailed description
 
@@ -24,6 +24,13 @@ Features:
   Manager or WhatsApp Cloud API setup.
 - Business knowledge, local notes, client stages and follow-up reminders.
 - Picture and receipt understanding with review safeguards.
+- Call and meeting audio recording with transcripts, then a customer-facing
+  call summary: a thank-you, what was discussed, next steps and open items.
+  Name the company and customer speakers for better results.
+- Speech-to-text WhatsApp replies with AI polish — professional, shorter,
+  clearer or summarized — reviewed before you press Send.
+- A compact panel that keeps the composer, client details and call notes on
+  screen without scrolling.
 - Human takeover controls and manual review before sending.
 - A seven-day trial, then a one-time $9.99 USD unlock through Stripe Checkout.
 
@@ -40,12 +47,14 @@ is not affiliated with, endorsed by, or produced by Meta or WhatsApp.
 
 - **Single purpose:** help a business draft and manage replies in WhatsApp Web.
 - **Data used:** visible WhatsApp conversation/contact details, user-provided
-  business documents and notes, selected images, follow-ups, settings, and the
-  user-provided OpenAI API key.
-- **Data transfer:** selected draft context goes directly to `api.openai.com`
+  business documents and notes, selected images, follow-ups, settings,
+  optional call recordings and transcripts with user-supplied participant and
+  speaker names, and the user-provided OpenAI API key.
+- **Data transfer:** selected draft context, optional dictation and call
+  audio, transcripts and user-supplied names go directly to `api.openai.com`
   using the user's key. Stripe receives payment details through hosted
   Checkout. The licensing service receives an installation identifier and
-  license status, not conversations or the OpenAI key.
+  license status, not conversations, recordings or the OpenAI key.
 - **Data sale:** none.
 - **Authentication:** no WhatsApp or Meta credentials are collected by the
   extension; WhatsApp Web's own QR linking flow is used.
