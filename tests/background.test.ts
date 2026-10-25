@@ -502,7 +502,7 @@ test("API keys are local-only, absent from panel state, and privileged commands 
 });
 test("provider keys stay local and sparse route updates preserve other saved tasks", async () => {
   const h = await harness();
-  assert.equal((await h.call("SAVE_KEY", { provider: "deepseek", key: "deepseek-fixture-key-123456" })).ok, true);
+  assert.equal((await h.call("SAVE_KEY", { provider: "deepseek", key: "testtesttesttest" })).ok, true);
   assert.equal((await h.call("SAVE_SETTINGS", { settings: { aiRoutes: { text: { provider: "deepseek", model: "deepseek-flash" }, vision: { provider: "gemini", model: "gemini-3.8-flash" } } } })).ok, true);
   assert.equal((await h.call("SAVE_SETTINGS", { settings: { aiRoutes: { text: { provider: "openrouter", model: "openai/gpt-fixture" } } } })).ok, true);
   const state = await h.call("GET_STATE");
@@ -510,18 +510,18 @@ test("provider keys stay local and sparse route updates preserve other saved tas
   assert.equal(state.value.settings.aiRoutes.vision.provider, "gemini");
   assert.equal(state.value.settings.aiRoutes.vision.model, "gemini-3.8-flash");
   assert.equal(state.value.providerStatus.deepseek, true);
-  assert.ok(!JSON.stringify(state).includes("deepseek-fixture-key-123456"));
+  assert.ok(!JSON.stringify(state).includes("testtesttesttest"));
 });
 test("assistant replies dispatch to the selected provider and reject unsupported explicit routes", async () => {
   const h = await harness();
-  await h.call("SAVE_KEY", { provider: "deepseek", key: "deepseek-fixture-key-123456" });
+  await h.call("SAVE_KEY", { provider: "deepseek", key: "testtesttesttest" });
   await h.call("SAVE_SETTINGS", { settings: { aiRoutes: { text: { provider: "deepseek", model: "deepseek-flash" } } } });
   await h.publish(context());
   const result = await h.call("GENERATE");
   assert.equal(result.ok, true);
   assert.equal(h.requests[0].url, "https://api.deepseek.com/chat/completions");
   assert.equal(h.requests[0].body.model, "deepseek-flash");
-  assert.ok(!JSON.stringify(h.requests[0].body).includes("deepseek-fixture-key-123456"));
+  assert.ok(!JSON.stringify(h.requests[0].body).includes("testtesttesttest"));
   const invalid = await h.call("SAVE_SETTINGS", { settings: { aiRoutes: { vision: { provider: "deepseek", model: "deepseek-v4-pro" } } } });
   assert.equal(invalid.ok, false);
   assert.equal((await h.call("GET_STATE")).value.settings.aiRoutes.vision.provider, "openai");
