@@ -1,8 +1,8 @@
 Desk AI for WhatsApp Web is an open-source Chrome extension, created by **Kudakwashe Musasiwa** and licensed under **MIT**.
 
-![Desk AI for WhatsApp Web preview with a fictional customer conversation and reply assistant](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/whatsapp-desk-preview.png)
+![The Desk AI panel beside a WhatsApp Web conversation with call notes open](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/mg-desk-preview.png)
 
-*Desk AI for WhatsApp Web design preview with fictional sample data. No live customer chats or API key are shown.*
+*The shared Desk AI panel design inside WhatsApp Web, shown here in the MG Desk deployment.*
 
 ## Feature highlights
 
@@ -60,12 +60,6 @@ These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome:
 **2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
 
 ![Click Load unpacked in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/load-unpacked.png)
-
-### Earlier design example
-
-The supplied screenshot below shows the earlier MG Desk name with fictional sample data.
-
-![Earlier MG Desk design preview supplied as an example](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/mg-desk-preview-example.png)
 
 ## Connect your key and business
 
