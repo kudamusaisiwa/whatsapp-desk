@@ -53,6 +53,7 @@ import { STORE_RELEASE } from "./release";
 import { windowState } from "./core";
 import { replyCountdown } from "./pacing";
 import { readKnowledge } from "./files";
+import { AI_TASKS, PROVIDERS, defaultRoutes, routeSupports, type AiRoute, type AiTask, type ProviderId } from "./providers";
 import "@fontsource/dm-sans/latin-400.css";
 import "@fontsource/dm-sans/latin-500.css";
 import "@fontsource/dm-sans/latin-600.css";
@@ -167,7 +168,7 @@ function LicenseBanner({
         <small>
           {locked
             ? "Unlock the assistant for a one-time $9.99 payment."
-            : `${licenseSummary(license, now)} · bring your own OpenAI key.`}
+            : `${licenseSummary(license, now)} · bring your own provider API key.`}
         </small>
       </div>
       <button className="text-button" onClick={openSettings}>
@@ -857,7 +858,7 @@ function SetupChecklist({
         onClick={() => select("settings")}
       >
         <KeyRound size={18} />
-        <span>Connect your OpenAI key</span>
+        <span>Connect an AI provider key</span>
         {desk.hasKey ? <Check size={16} /> : <ArrowRight size={16} />}
       </button>
     </div>
@@ -1435,10 +1436,10 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
       )}
       <div
         className="info-note one-line"
-        title="Documents stay on this device. Relevant excerpts and the current conversation are sent directly to OpenAI when drafting. Scanned PDFs need readable text or OCR."
+        title="Documents stay on this device. Relevant excerpts and the current conversation are sent to the selected AI provider when drafting. Scanned PDFs need readable text or OCR."
       >
         <LockKeyhole size={14} />
-        <p>Documents stay on this device · excerpts go to OpenAI when drafting</p>
+        <p>Documents stay on this device · excerpts go to your selected AI provider when drafting</p>
       </div>
     </div>
   );
@@ -1446,6 +1447,7 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
 const CUSTOM_MODEL = "__custom__";
 const EDITABLE_SETTINGS = [
   "model",
+  "aiRoutes",
   "businessName",
   "businessInstructions",
   "dateOrder",
@@ -1510,8 +1512,8 @@ function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
         <>
           <p className="license-copy">
             The one-time unlock is <strong>$9.99 USD</strong>. Stripe handles
-            payment on its hosted checkout page. Your OpenAI key remains your
-            own and is never sent to Stripe or {APP_NAME}.
+            payment on its hosted checkout page. Your provider keys remain yours
+            and are never sent to Stripe or {APP_NAME}.
           </p>
           {license.status === "unconfigured" ? (
             <p className="inline-error" role="alert">
@@ -1560,18 +1562,33 @@ function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
 function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
   const [edits, setEdits] = useState<Partial<EditableSettings>>({});
   const [key, setKey] = useState("");
+  const [keyProvider, setKeyProvider] = useState<ProviderId>("openai");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showKey, setShowKey] = useState(false);
-  const [customModel, setCustomModel] = useState(false);
+  const [customTasks, setCustomTasks] = useState<Partial<Record<AiTask, boolean>>>({});
   const form: Settings = { ...desk.settings, ...edits };
+  const currentRoutes = { ...defaultRoutes(desk.settings.model), ...desk.settings.aiRoutes };
+  const routes: Record<AiTask, AiRoute> = { ...defaultRoutes(desk.settings.model), ...desk.settings.aiRoutes, ...edits.aiRoutes } as Record<AiTask, AiRoute>;
+  const routeChanges: Partial<Record<AiTask, AiRoute>> = {};
+  for (const task of AI_TASKS) {
+    const id = task.id as AiTask;
+    if (JSON.stringify(routes[id]) !== JSON.stringify(currentRoutes[id])) routeChanges[id] = routes[id];
+  }
   const changed: Partial<EditableSettings> = {};
   for (const field of EDITABLE_SETTINGS)
-    if (field in edits && edits[field] !== desk.settings[field])
+    if (field !== "model" && field !== "aiRoutes" && field in edits && edits[field] !== desk.settings[field])
       Object.assign(changed, { [field]: edits[field] });
+  if (Object.keys(routeChanges).length) Object.assign(changed, { aiRoutes: routeChanges });
+  if (routeChanges.text && routeChanges.text.model !== desk.settings.model)
+    Object.assign(changed, { model: routeChanges.text.model });
   const dirty = Object.keys(changed).length > 0;
   const edit = (patch: Partial<EditableSettings>) =>
     setEdits((current) => ({ ...current, ...patch }));
+  const editRoute = (task: AiTask, patch: Partial<AiRoute>) => {
+    const next = { ...routes[task], ...patch };
+    setEdits((current) => ({ ...current, aiRoutes: { ...current.aiRoutes, [task]: next } }));
+  };
   const setAutomation = (patch: Partial<Settings>) =>
     void act("SAVE_SETTINGS", { settings: patch }).catch(() => {});
   async function save(e: React.FormEvent) {
@@ -1581,6 +1598,7 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
     try {
       await act("SAVE_SETTINGS", { settings: changed }, "Workspace settings saved.");
       setEdits({});
+      setCustomTasks({});
     } catch {
     } finally {
       setSaving(false);
@@ -1590,34 +1608,40 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
     if (!key.trim()) return;
     setSaving(true);
     try {
-      await act("SAVE_KEY", { key }, "OpenAI key saved locally.");
+      await act("SAVE_KEY", { provider: keyProvider, key }, `${providerLabel(keyProvider)} key saved locally.`);
       setKey("");
       setLoading(true);
-      await act("LOAD_MODELS", {}, "Connected. Available models refreshed.");
+      await act("LOAD_MODELS", { provider: keyProvider }, "Connected. Available models refreshed.");
     } catch {
     } finally {
       setSaving(false);
       setLoading(false);
     }
   }
-  const models = [
-    ...new Set([
-      ...desk.models,
-      ...(!desk.models.length ? ["gpt-5-mini", "gpt-4.1-mini", "gpt-4.1"] : []),
-    ]),
-  ];
-  const showCustomModel = customModel || !models.includes(form.model);
+  async function loadProviderModels(provider: ProviderId) {
+    setLoading(true);
+    try { await act("LOAD_MODELS", { provider }, "Available models refreshed."); }
+    catch { /* act displays the provider error */ }
+    finally { setLoading(false); }
+  }
+  const selectedProviderReady = desk.providerStatus?.[keyProvider] ?? (keyProvider === "openai" && desk.hasKey);
+  const providerLabel = (id: ProviderId) => PROVIDERS.find((p) => p.id === id)?.label ?? id;
   return (
     <>
       <PageTitle title="Settings" />
       <LicenseCard desk={desk} act={act} />
       <details className="form-card settings-section key-card" open={!desk.hasKey}>
         <SettingsSummary
-          title="OpenAI connection"
+          title="AI provider keys"
           icon={<KeyRound size={16} />}
-          value={desk.hasKey ? "Key saved" : "Not connected"}
+          value={Object.values(desk.providerStatus ?? {}).some(Boolean) || desk.hasKey ? "Provider connected" : "No provider connected"}
         />
         <div className="settings-body">
+          <label>Provider to manage
+            <select aria-label="Credential provider" value={keyProvider} onChange={(e) => { setKeyProvider(e.target.value as ProviderId); setKey(""); setShowKey(false); }}>
+              {PROVIDERS.map((provider) => <option key={provider.id} value={provider.id}>{provider.label}</option>)}
+            </select>
+          </label>
           <label>
             API key
             <div className="key-input">
@@ -1628,11 +1652,9 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
                 placeholder={
-                  desk.hasKey
-                    ? "Paste a new key to replace the saved one"
-                    : "sk-…"
+                  selectedProviderReady ? "Paste a new key to replace the saved one" : "Paste provider API key"
                 }
-                aria-label="OpenAI API key"
+                aria-label={`${providerLabel(keyProvider)} API key`}
               />
               <button
                 type="button"
@@ -1654,7 +1676,7 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
             ) : (
               <LockKeyhole size={16} />
             )}
-            Save key & connect
+            Save {providerLabel(keyProvider)} key
           </button>
           <p className="key-privacy">
             <ShieldCheck size={13} />
@@ -1662,20 +1684,21 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
             exposed to the WhatsApp page. Anyone with access to your browser
             profile may access it.
           </p>
-          {desk.hasKey && (
+          {selectedProviderReady && (
             <button
               className="text-button danger"
               onClick={() =>
                 void act(
                   "SAVE_KEY",
-                  { key: "" },
-                  "Saved OpenAI key removed.",
+                  { provider: keyProvider, key: "" },
+                  `Saved ${providerLabel(keyProvider)} key removed.`,
                 ).catch(() => {})
               }
             >
-              Remove saved key
+              Remove {providerLabel(keyProvider)} key
             </button>
           )}
+          <p className="field-hint">Each provider key is stored separately in this browser profile. Saved keys are never shown again.</p>
         </div>
       </details>
       <form
@@ -1684,69 +1707,36 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
           (e.target as HTMLElement).closest("details")?.setAttribute("open", "")
         }
       >
-        <details className="form-card settings-section">
-          <SettingsSummary
-            title="Reply model"
-            icon={<Sparkles size={16} />}
-            value={form.model}
-          />
+        <details className="form-card settings-section provider-routes" open>
+          <SettingsSummary title="AI tasks and models" icon={<Sparkles size={16} />} value={`${AI_TASKS.length} tasks configured`} />
           <div className="settings-body">
-            <div className="label-row">
-              <label htmlFor="settings-model">Model</label>
-              <button
-                className="text-button"
-                type="button"
-                disabled={!desk.hasKey || loading}
-                onClick={async () => {
-                  setLoading(true);
-                  try {
-                    await act("LOAD_MODELS", {}, "Available models refreshed.");
-                  } catch {
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              >
-                <RefreshCw size={13} className={loading ? "spin" : ""} />
-                Refresh
-              </button>
-            </div>
-            <select
-              id="settings-model"
-              aria-label="Model"
-              value={showCustomModel ? CUSTOM_MODEL : form.model}
-              onChange={(e) => {
-                if (e.target.value === CUSTOM_MODEL) setCustomModel(true);
-                else {
-                  setCustomModel(false);
-                  edit({ model: e.target.value });
-                }
-              }}
-            >
-              {models.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-              <option value={CUSTOM_MODEL}>Custom model ID…</option>
-            </select>
-            {showCustomModel && (
-              <input
-                className="model-custom"
-                aria-label="Custom model ID"
-                value={form.model}
-                required
-                maxLength={150}
-                spellCheck={false}
-                onChange={(e) => edit({ model: e.target.value })}
-                placeholder="e.g. gpt-5-mini"
-              />
-            )}
-            <p className="field-hint">
-              Pick a model or type an ID. Choose one that supports image input
-              and structured output to read pictures. Usage is billed to your
-              OpenAI account.
-            </p>
+            <p className="field-hint">Choose a provider independently for each task. Models are discovered when available; custom model IDs can always be entered.</p>
+            {AI_TASKS.map((task) => {
+              const taskId = task.id as AiTask;
+              const route = routes[taskId];
+              const availableProviders = PROVIDERS.filter((p) => p.tasks.includes(taskId));
+              const provider = PROVIDERS.find((p) => p.id === route.provider)!;
+              const discoveredModels = desk.providerModels?.[route.provider] ?? [];
+              const isSpeechTask = taskId === "stt" || taskId === "callStt";
+              const models = [...new Set([...(isSpeechTask ? (provider.sttModels ?? []) : (discoveredModels.length ? discoveredModels : provider.models))])].filter((model) => routeSupports({ provider: route.provider, model }, taskId));
+              const custom = customTasks[taskId] ?? !models.includes(route.model);
+              const routeReady = desk.providerStatus?.[route.provider] ?? (route.provider === "openai" && desk.hasKey);
+              return <section className="provider-route" key={taskId} aria-label={`${task.label} route`}>
+                <div className="provider-route-heading"><div><strong>{task.label}</strong><small>{task.description}</small></div>
+                  <button className="text-button" type="button" disabled={loading || !routeReady} onClick={() => void loadProviderModels(route.provider)} aria-label={`Refresh ${provider.label} models`}><RefreshCw size={13} className={loading ? "spin" : ""} />Refresh</button>
+                </div>
+                <label>Provider<select aria-label={`${task.label} provider`} value={route.provider} onChange={(e) => { const nextProvider = e.target.value as ProviderId; const nextMeta = PROVIDERS.find((p) => p.id === nextProvider)!; const candidate = taskId === "stt" || taskId === "callStt" ? nextMeta.sttModels?.[0] : undefined; editRoute(taskId, { provider: nextProvider, model: candidate ?? nextMeta.models.find((model) => routeSupports({ provider: nextProvider, model }, taskId)) ?? "" }); }}>
+                  {availableProviders.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select></label>
+                <label>Model<select aria-label={`${task.label} model`} value={custom ? CUSTOM_MODEL : route.model} onChange={(e) => { if (e.target.value === CUSTOM_MODEL) setCustomTasks((current) => ({ ...current, [taskId]: true })); else { setCustomTasks((current) => ({ ...current, [taskId]: false })); editRoute(taskId, { model: e.target.value }); } }}>
+                  {models.map((model) => <option key={model} value={model}>{model}</option>)}
+                  <option value={CUSTOM_MODEL}>Custom model ID…</option>
+                </select></label>
+                {(custom || route.model === "") && <input className="model-custom" aria-label={`${task.label} custom model ID`} value={route.model} required maxLength={150} spellCheck={false} onChange={(e) => editRoute(taskId, { model: e.target.value })} placeholder="Enter model ID" />}
+                <p className="field-hint">{taskId === "vision" ? `Pictures and payment proof images are sent to ${provider.label} for interpretation.` : taskId === "text" ? `Conversation text and relevant attachments are sent to ${provider.label} for assistant replies.` : taskId === "polish" ? `Only the selected text is sent to ${provider.label} for editing.` : taskId === "summary" ? `Call transcripts are sent to ${provider.label} to write summaries.` : `Recorded audio is sent to ${provider.label} for transcription.`}</p>
+              </section>;
+            })}
+            <p className="field-hint">ChatGPT subscription <a href="https://developers.openai.com/siwc/token-sharing-open-source" target="_blank" rel="noreferrer">token sharing information</a>. Requires a local sign-in companion; API keys work directly in this extension.</p>
           </div>
         </details>
         <details className="form-card settings-section">
@@ -1869,7 +1859,7 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
             <button
               type="button"
               className="secondary-button compact-button"
-              onClick={() => setEdits({})}
+              onClick={() => { setEdits({}); setCustomTasks({}); }}
               disabled={saving}
             >
               Discard

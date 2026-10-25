@@ -7,7 +7,9 @@ manual-install release is unchanged.
 
 - Seven-day trial issued by the licensing service.
 - One-time **$9.99 USD** unlock through Stripe Checkout.
-- The customer supplies their own OpenAI API key. No OpenAI key is included,
+- The customer supplies their own provider API credentials. Supported AI
+  providers are OpenAI, OpenRouter, Kimi (Moonshot), DeepSeek, Anthropic,
+  Google Gemini and xAI Grok. No provider keys or usage credits are included,
   shared or billed by Desk AI for WhatsApp Web.
 - The Worker uses a hosted Stripe Payment Link, so no Stripe API secret is
   needed in the extension or licensing service. The webhook signing secret and
@@ -39,7 +41,8 @@ The command creates:
 
 The command fails closed if the license API is missing, not HTTPS, or the
 package contains an unexpected file. The package contains no Stripe secret,
-OpenAI key, browser profile, customer data or source tree.
+provider key, ChatGPT subscription token, browser profile, customer data or
+source tree.
 
 ## Chrome Web Store upload
 
@@ -52,9 +55,11 @@ unpacked** testing.
 In the dashboard, complete the Store Listing, Privacy, Distribution and Test
 Instructions sections. Use the deployed privacy-policy URL, state that the
 extension is an independent project (not Meta/WhatsApp), explain the
-WhatsApp Web host permission and OpenAI data flow, and disclose the external
-Stripe checkout/trial. Identify Kudakwashe Musasiwa as the seller. The hosted
-privacy and terms pages include the support tracker and 14-day refund policy;
+WhatsApp Web host permission and task-specific data flow to the selected AI
+providers, and disclose the external Stripe checkout/trial. Identify
+Kudakwashe Musasiwa as the seller. The hosted privacy and terms pages include
+the support tracker and 14-day refund policy. The site also serves
+`/ai-providers.html` with provider, billing and data-flow details;
 review those pages and the Web Store disclosures together before submitting.
 The Web Store edition keeps automatic sending off and requires the user to
 review and click Send.
@@ -82,6 +87,18 @@ Worker secrets (`STRIPE_WEBHOOK_SECRET` and `LICENSE_TOKEN_SECRET`), then
 deploy. Configure the live Payment Link ID and URL as Worker variables. The
 Worker URL becomes
 `WHATSAPP_DESK_LICENSE_API_URL` for the extension package command.
+
+The currently documented public site is
+`https://whatsapp-desk-license-site.bakani.workers.dev`:
+
+- Landing page: `/`
+- Privacy policy: `/privacy.html`
+- Terms: `/terms.html`
+- AI provider information: `/ai-providers.html`
+
+From `chrome-webstore/cloudflare/`, deploy the Worker and static pages with
+`npm run typecheck` followed by `npm run deploy`. Review the Worker README for
+database, Stripe and production configuration before deployment.
 
 ## Licensing service contract
 

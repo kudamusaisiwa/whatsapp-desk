@@ -1,4 +1,5 @@
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+import { providerEndpoint, providerHeaders, type ProviderId } from "./providers";
 const MIME_EXTENSIONS: Record<string, string> = {
   "audio/webm;codecs=opus": "webm", "audio/webm": "webm",
   "audio/ogg;codecs=opus": "ogg", "audio/ogg": "ogg",
@@ -7,7 +8,9 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "audio/x-wav": "wav", "audio/flac": "flac",
 };
 
-export async function transcribeAudio(audio: unknown, mimeType: unknown, key: string, maxBytes = MAX_AUDIO_BYTES, maxTranscriptChars = 8000, prompt?: string): Promise<{ text: string }> {
+export async function transcribeAudio(audio: unknown, mimeType: unknown, key: string, maxBytes = MAX_AUDIO_BYTES, maxTranscriptChars = 8000, prompt?: string, provider: ProviderId = "openai", model?: string): Promise<{ text: string }> {
+  if (provider !== "openai" && provider !== "openrouter" && provider !== "gemini")
+    throw new Error("This provider does not support speech transcription. Choose OpenAI, OpenRouter or Gemini for this task.");
   const maxBase64 = 4 * Math.ceil(maxBytes / 3);
   const isCall = maxBytes > MAX_AUDIO_BYTES;
   const sizeMessage = `Recording is too large. Keep it under ${Math.floor(maxBytes / (1024 * 1024))} MB.`;
@@ -36,33 +39,51 @@ export async function transcribeAudio(audio: unknown, mimeType: unknown, key: st
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const form = new FormData();
   form.append("file", new Blob([bytes], { type: mimeType }), `recording.${MIME_EXTENSIONS[mimeType]}`);
-  form.append("model", "whisper-1");
+  form.append("model", model || (provider === "openrouter" ? "openai/whisper-1" : "whisper-1"));
   if (prompt) form.append("prompt", prompt);
   form.append("response_format", "json");
   let response: Response;
+  const selectedModel = model || (provider === "openrouter" ? "openai/whisper-1" : provider === "gemini" ? "gemini-3.8-flash" : "whisper-1");
+  const isGemini = provider === "gemini";
   try {
-    response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form,
+    const endpointUrl = provider === "openai"
+      ? "https://api.openai.com/v1/audio/transcriptions"
+      : provider === "openrouter"
+        ? "https://openrouter.ai/api/v1/audio/transcriptions"
+        : providerEndpoint("gemini", selectedModel).url;
+    const requestBody = isGemini ? JSON.stringify({
+      contents: [{ role: "user", parts: [
+        { text: `${prompt ? `${prompt}\n\n` : ""}Transcribe the supplied audio verbatim. Return only the transcript, with no commentary.` },
+        { inlineData: { mimeType: mimeType.split(";")[0].replace("audio/x-wav", "audio/wav"), data: audio } },
+      ] }],
+      generationConfig: { maxOutputTokens: Math.min(65536, Math.ceil(maxTranscriptChars / 2)) },
+    }) : undefined;
+    response = await fetch(endpointUrl, {
+      method: "POST", headers: providerHeaders(provider, key, isGemini), body: requestBody ?? form,
       signal: AbortSignal.timeout(isCall ? 60000 : 45000),
     });
   } catch (error) {
     throw new Error(error instanceof Error && error.name === "TimeoutError"
       ? "Voice transcription took too long. Try a shorter recording."
-      : "OpenAI could not be reached for voice transcription. Check your connection and try again.");
+      : `${provider === "openai" ? "OpenAI" : provider === "openrouter" ? "OpenRouter" : "Gemini"} could not be reached for voice transcription. Check your connection and try again.`);
   }
   if (!response.ok) {
     const messages: Record<number, string> = {
       400: "The recording could not be transcribed. Try recording it again.",
-      401: "The OpenAI key was not accepted. Check the key in Settings.",
+      401: `The ${provider === "openai" ? "OpenAI" : provider === "openrouter" ? "OpenRouter" : "Gemini"} key was not accepted. Check the key in Settings.`,
       413: "Recording is too large. Keep it under 10 MB.",
-      429: "OpenAI usage or rate limit reached. Try again shortly.",
+      429: `${provider === "openai" ? "OpenAI" : provider === "openrouter" ? "OpenRouter" : "Gemini"} usage or rate limit reached. Try again shortly.`,
     };
     throw new Error(messages[response.status] ?? `Voice transcription is temporarily unavailable (${response.status}). Try again shortly.`);
   }
   let result: any;
-  try { result = await response.json(); } catch { throw new Error("OpenAI returned an invalid transcription. Please try again."); }
-  if (typeof result?.text !== "string" || !result.text.trim()) throw new Error("No speech was recognized. Try recording again.");
-  const transcript = result.text.trim();
+  try { result = await response.json(); } catch { throw new Error(`${provider === "openai" ? "OpenAI" : provider === "openrouter" ? "OpenRouter" : "Gemini"} returned an invalid transcription. Please try again.`); }
+  const candidate = result?.candidates?.[0];
+  if (isGemini && candidate?.finishReason !== "STOP")
+    throw new Error("Gemini stopped before finishing the transcription. Try a shorter recording or choose a larger output limit.");
+  const outputText = isGemini ? (candidate?.content?.parts ?? []).filter((p: any) => !p.thought).map((p: any) => p.text ?? "").join("") : result?.text;
+  if (typeof outputText !== "string" || !outputText.trim()) throw new Error("No speech was recognized. Try recording again.");
+  const transcript = outputText.trim();
   if (isCall && transcript.length > maxTranscriptChars)
     throw new Error("The call transcript is over 100,000 characters. It was not shortened, so no actions were lost; use a shorter recording and try again.");
   return { text: transcript.slice(0, maxTranscriptChars) };

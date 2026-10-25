@@ -3,6 +3,7 @@ import { BookOpen, Check, CircleHelp, ClipboardPaste, Copy, LoaderCircle, Sparkl
 import { rpc } from "./bridge";
 import { SPEECH_PRIVACY_NOTE, SpeechInput } from "./speech";
 import type { DeskState, Draft } from "./types";
+import { defaultRoutes, PROVIDERS } from "./providers";
 
 type Target = { chatId: string; name: string };
 type PolishStyle = "professional" | "shorten" | "clarify" | "summarize";
@@ -45,6 +46,9 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
   const contextIdRef = useRef(desk.context?.chatId ?? null);
   const contextRef = useRef(desk.context);
   const contextId = desk.context?.chatId ?? null;
+  const routes = { ...defaultRoutes(desk.settings.model), ...desk.settings.aiRoutes };
+  const sttReady = desk.providerStatus?.[routes.stt.provider] ?? (routes.stt.provider === "openai" && desk.hasKey);
+  const textProvider = PROVIDERS.find((provider) => provider.id === routes.text.provider)?.label ?? routes.text.provider;
   contextIdRef.current = contextId;
   instructionRef.current = instruction;
   targetRef.current = dictationTarget;
@@ -315,6 +319,7 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
         <div className="assistant-toolbar">
           <SpeechInput
             compact
+            disabled={!sttReady}
             onRecordingStart={onRecordingStart}
             onTranscript={onTranscript}
           />
@@ -344,7 +349,7 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
           <small>Keep your WhatsApp edits, or clear its message box and try again.</small>
           <button type="button" className="text-button" onClick={retrySync} disabled={syncing}>Try again</button>
         </div>}
-        {!desk.hasKey && <button className="setup-link" onClick={openSettings}>Connect OpenAI in Settings to get assistance</button>}
+        {!desk.hasKey && <button className="setup-link" onClick={openSettings}>Connect {textProvider} in Settings to get assistance</button>}
         {context?.messages.slice(-35).some((message) => message.images?.length) && <p className="field-hint">Pictures detected. Open or download blurred images in WhatsApp so the assistant can read them.</p>}
         {error && <p className="assistant-error" role="alert">{error}</p>}
         {suggestion && (

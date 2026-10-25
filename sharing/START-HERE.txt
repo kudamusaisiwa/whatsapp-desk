@@ -1,10 +1,10 @@
 DESK AI FOR WHATSAPP WEB — START HERE
-Chrome extension • Version 0.3.3 • Bring your own OpenAI API key
+Chrome extension • Version 0.5.0 • Bring your own provider API key
 
 1. INSTALL IN CHROME
 
 1) Download WhatsApp-Desk.zip and unzip it:
-   https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.3.3/WhatsApp-Desk.zip
+   https://github.com/kudamusaisiwa/whatsapp-desk/releases/latest/download/WhatsApp-Desk.zip
 2) Keep the extracted WhatsApp Desk folder somewhere permanent, such as Documents. The extension is named Desk AI for WhatsApp Web inside Chrome.
 3) Open chrome://extensions in Chrome and turn on Developer mode.
 4) Click Load unpacked and select this folder inside the unzipped download:
@@ -24,22 +24,31 @@ Load unpacked again, then select WhatsApp Desk/releases/WhatsApp-Desk.
 
 2. CONNECT YOUR OWN OPENAI KEY
 
-1) Sign in to https://platform.openai.com/api-keys and create your own secret key.
-2) Make sure API billing is set up in your OpenAI account. API usage is charged
-   to your account separately from a ChatGPT subscription.
-3) In Desk AI for WhatsApp Web, open Settings. Paste the key under OpenAI connection and
-   click Save key & connect.
-4) Refresh the model list. Choose a model available to your project that
-   supports Responses and structured output (and image input for pictures).
-   Save workspace settings. You can also enter an exact model ID.
+1) Choose one of the supported providers: OpenAI, OpenRouter, Kimi (Moonshot),
+   DeepSeek, Anthropic, Google Gemini or xAI Grok. Create your own API key
+   through that provider's official account dashboard.
+2) Set up API access and billing with that provider. API usage is billed by
+   the provider/account owner. OpenAI API billing is separate from a ChatGPT
+   subscription; this extension does not include ChatGPT-plan access.
+3) In Desk AI for WhatsApp Web, open Settings, choose a provider for the task,
+   enter your key and save the connection.
+4) Refresh that provider's model list. Pick a model compatible with the task,
+   or enter its exact model ID. Set routes independently for replies/general
+   assistant, images, polish, call summaries, dictation and call transcription.
 
-This edition currently supports OpenAI keys only. No key is supplied.
-Never send your secret key to the person who gave you this ZIP.
-The entered key is saved only in this extension's local browser storage and
-is sent to OpenAI for authentication. It is not synced or exposed to the
-WhatsApp webpage. It is not independently encrypted: someone with access
-to your browser profile or extension developer tools may access it.
-To remove it, use Settings > Remove saved key.
+No provider key is supplied. Never send your secret key to the person who
+gave you this ZIP. Keys are saved in this extension's local browser storage,
+are not synced or exposed to the WhatsApp webpage, and are sent only to the
+selected provider for requests. They are not independently encrypted: someone
+with access to your browser profile or extension developer tools may access
+them. Remove saved keys in Settings.
+
+Model compatibility varies. OpenAI, OpenRouter and Gemini transcription
+adapters are available. Other providers do not currently support speech-to-
+text in Desk AI. Image understanding requires a model with image input. Image
+generation and text-to-speech are not included. See
+https://github.com/kudamusaisiwa/whatsapp-desk/blob/main/docs/ai-providers.md
+for current provider details and limitations.
 
 3. ADD YOUR BUSINESS
 
@@ -62,11 +71,14 @@ review. A reply flagged for human review still stays as a draft.
 4. PRIVACY AND EVERYDAY USE
 
 AI drafting sends relevant business knowledge and recent visible chat messages
-directly to OpenAI. Loaded photos/screenshots may be included. The recipient
-must be comfortable using AI with their business and customer information.
-The extension requests that OpenAI not store response objects (store: false);
-OpenAI's own API data policies still apply. There is no hosted app backend
-or analytics in this extension.
+to the provider selected for that task. Drafts can include relevant business
+excerpts, recent visible chat messages and loaded photos/screenshots. Polishing
+sends only selected text; call summaries send transcript and supplied names.
+Audio is sent for transcription only after you start that action. The recipient
+must be comfortable using that provider with business and customer
+information. Each provider's data and retention terms apply. The extension
+does not send AI content to the licensing service and has no advertising
+analytics.
 
 Keys, knowledge, client notes and follow-ups stay in this browser profile.
 Removing the extension removes its local data. Chrome must be running and
@@ -83,7 +95,7 @@ This is an independent assistant, not an official Meta/WhatsApp product.
   refresh WhatsApp Web. Collapse/expand it with its Chrome toolbar button.
 - Cannot find manifest.json: unzip WhatsApp-Desk.zip, click Load unpacked and
   select WhatsApp Desk/releases/WhatsApp-Desk.
-- Key rejected: replace it with your own valid OpenAI API key in Settings.
+- Key rejected: check that provider's account access, billing and key, then reconnect in Settings.
 - Usage/rate limit: check your API billing, credits and project limits.
 - Model unavailable: refresh the model list and choose a compatible model.
 - Generic or missing answers: add your own approved documents in Knowledge.
@@ -97,7 +109,9 @@ Avoid removing/reinstalling if you want to retain the extension's local data.
 OFFICIAL REFERENCES
 Chrome installation:
 https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world
+Provider directory and routing details:
+https://github.com/kudamusaisiwa/whatsapp-desk/blob/main/docs/ai-providers.md
 OpenAI API keys:
 https://platform.openai.com/api-keys
-Separate API billing:
+Separate OpenAI API billing:
 https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform

@@ -1,4 +1,5 @@
 import { DEFAULT_BUSINESS_NAME, DEFAULT_BUSINESS_INSTRUCTIONS } from "./product";
+import type { AiRoute, AiTask, ProviderId } from "./providers";
 export type DateOrder = "DMY" | "MDY";
 export type Stage = "New lead" | "In conversation" | "Follow-up" | "Client";
 export interface Settings {
@@ -9,6 +10,7 @@ export interface Settings {
   autoDraft: boolean;
   allChats: boolean;
   dateOrder: DateOrder;
+  aiRoutes?: Partial<Record<AiTask, AiRoute>>;
 }
 export interface Knowledge {
   id: string;
@@ -120,6 +122,8 @@ export interface DeskState {
   followUps: FollowUp[];
   hasKey: boolean;
   models: string[];
+  providerStatus?: Partial<Record<ProviderId, boolean>>;
+  providerModels?: Partial<Record<ProviderId, string[]>>;
   context: ChatContext | null;
   draft: Draft | null;
   activity: string;

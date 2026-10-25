@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AudioLines, ChevronDown, CircleStop, LoaderCircle, Mic, Phone, Sparkles } from "lucide-react";
 import { rpc } from "./bridge";
 import type { DeskState } from "./types";
+import { defaultRoutes, PROVIDERS } from "./providers";
 
 type CallSession = { sessionId: string; chatId: string; name: string; startedAt: number; speakers?: { business?: string; customer?: string } };
 type CaptureStatus = {
@@ -59,6 +60,11 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
   const contextId = desk.context?.chatId ?? null;
+  const routes = { ...defaultRoutes(desk.settings.model), ...desk.settings.aiRoutes };
+  const callSttReady = desk.providerStatus?.[routes.callStt.provider] ?? (routes.callStt.provider === "openai" && desk.hasKey);
+  const callSttProvider = PROVIDERS.find((provider) => provider.id === routes.callStt.provider)?.label ?? routes.callStt.provider;
+  const summaryProvider = PROVIDERS.find((provider) => provider.id === routes.summary.provider)?.label ?? routes.summary.provider;
+  const summaryReady = desk.providerStatus?.[routes.summary.provider] ?? (routes.summary.provider === "openai" && desk.hasKey);
   contextRef.current = desk.context;
   transcriptRef.current = transcript;
   summaryRef.current = summary;
@@ -125,8 +131,8 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
 
   async function startRecording() {
     const target = contextRef.current;
-    if (!desk.hasKey) {
-      setError("Connect OpenAI in Settings before recording a call for notes.");
+    if (!callSttReady) {
+      setError(`Connect ${callSttProvider} in Settings before recording a call for notes.`);
       return;
     }
     if (!target) {
@@ -295,7 +301,7 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
   async function summarize() {
     const origin = callOriginRef.current;
     const text = transcriptRef.current.trim();
-    if (!origin || !text || !desk.hasKey || phase === "summarizing") return;
+    if (!origin || !text || !summaryReady || phase === "summarizing") return;
     const revision = transcriptRevision.current;
     const noteRevision = summaryRevision.current;
     setPhase("summarizing");
@@ -349,8 +355,8 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
   const canRecord = phase === "idle" || phase === "ready" || phase === "transcription-error";
   const recordBlock = !contextId
     ? "Open the WhatsApp chat for the call before recording."
-    : !desk.hasKey
-      ? "Connect OpenAI in Settings before recording a call for notes."
+    : !callSttReady
+      ? `Connect ${callSttProvider} in Settings before recording a call for notes.`
       : undefined;
   return (
     <section className={`call-recorder ${bodyOpen ? "open" : ""}`} aria-label="Call notes" hidden={!visible} ref={rootRef}>
@@ -361,14 +367,14 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
           <ChevronDown size={14} className={bodyOpen ? "rotated" : ""} />
         </button>
         {active && <span className="call-recorder-time" aria-label={`Recording ${formatDuration(displayDuration)}`}><i />{formatDuration(displayDuration)}</span>}
-        {canRecord && <button type="button" className="call-record-button" onClick={() => void startRecording()} disabled={!contextId || !desk.hasKey} title={recordBlock}>
+        {canRecord && <button type="button" className="call-record-button" onClick={() => void startRecording()} disabled={!contextId || !callSttReady} title={recordBlock}>
           {transcript ? <><Mic size={15} />Record another call</> : <><Mic size={15} />Record call</>}
         </button>}
       </div>
       {bodyOpen && <div className="call-recorder-body" id="call-recorder-body">
         <p className="call-recorder-hint">Record both sides, then send the customer a reviewable call summary.</p>
       {!contextId && phase === "idle" && <p className="call-recorder-hint">Open the WhatsApp chat for the call before recording.</p>}
-      {!desk.hasKey && phase === "idle" && <p className="call-recorder-hint">Connect OpenAI in Settings before recording a call for notes.</p>}
+      {!callSttReady && phase === "idle" && <p className="call-recorder-hint">Connect {callSttProvider} in Settings before recording a call for notes.</p>}
       {callOrigin && <div className="call-recorder-origin"><span>Call with</span><strong>{callOrigin.name}</strong></div>}
       {(callOrigin || canRecord) && <div className="call-speakers">
         <label>Company speaker<input aria-label="Company speaker" maxLength={80} placeholder={desk.settings.businessName} value={speakers.business} onChange={(event) => { const next = { ...speakersRef.current, business: event.target.value }; speakersRef.current = next; setSpeakers(next); }} /></label>
@@ -393,8 +399,8 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
         <summary>Review transcript · {formatDuration(elapsedMs)}</summary>
         <textarea aria-label="Call transcript" value={transcript} onChange={(event) => { transcriptRevision.current++; transcriptRef.current = event.target.value; setTranscript(event.target.value); }} rows={5} />
       </details>}
-      {phase === "ready" && transcript && (!summary || transcript.trim() !== summarizedTranscript.current) && <button type="button" className="call-summarize-button" onClick={() => void summarize()} disabled={!desk.hasKey}>
-        <Sparkles size={15} />{desk.hasKey ? summary ? "Update call summary" : "Write call summary" : "Connect OpenAI to summarize"}
+      {phase === "ready" && transcript && (!summary || transcript.trim() !== summarizedTranscript.current) && <button type="button" className="call-summarize-button" onClick={() => void summarize()} disabled={!summaryReady}>
+        <Sparkles size={15} />{summaryReady ? summary ? "Update call summary" : "Write call summary" : `Connect ${summaryProvider} to summarize`}
       </button>}
       {summary && <div className="call-summary-block">
         <label htmlFor="call-action-note">Call summary for WhatsApp</label>
@@ -403,7 +409,7 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
         {syncFailed && <button type="button" className="text-button call-try-again" onClick={retrySummary} disabled={summarySyncing}>Try again</button>}
         {summarySyncing && <p className="call-recorder-status" role="status"><LoaderCircle size={13} className="spin" />Updating WhatsApp…</p>}
       </div>}
-      <p className="call-recorder-footnote">Call audio is sent to OpenAI for transcription. Review the call summary, then send it yourself in WhatsApp.</p>
+      <p className="call-recorder-footnote">Call audio is sent to {callSttProvider} for transcription. Review the call summary, then send it yourself in WhatsApp.</p>
       </div>}
     </section>
   );

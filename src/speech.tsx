@@ -3,7 +3,7 @@ import { LoaderCircle, Mic, Square } from "lucide-react";
 import { MAX_AUDIO_BYTES, MAX_RECORDING_MS, Recorder } from "./recording";
 
 export const SPEECH_PRIVACY_NOTE =
-  "Recorded audio is sent to OpenAI for transcription and is not saved in Desk AI for WhatsApp.";
+  "Recorded audio is sent to the selected transcription provider and is not saved in Desk AI for WhatsApp.";
 
 export type SpeechInputState =
   | "idle"

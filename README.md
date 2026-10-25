@@ -2,7 +2,7 @@
 
 An open-source Chrome extension that puts business knowledge, AI reply drafts and follow-ups beside WhatsApp Web. Built by **Kudakwashe Musasiwa**, the initial author. Licensed under the [MIT License](LICENSE).
 
-Bring your own **OpenAI API key** and business information. No API key, customer data or business knowledge is supplied. Automatic drafting and sending are off by default.
+Bring your own API credentials and business information. No provider credentials, customer data or business knowledge are supplied. Provider usage is billed by the provider/account owner. Automatic drafting and sending are off by default.
 
 ![The Desk AI panel beside a WhatsApp Web conversation with call notes open](docs/images/mg-desk-preview.png)
 
@@ -14,11 +14,11 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 - **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
 - **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
 - **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
-- **Call and meeting notes:** record the audio of WhatsApp voice and video calls, transcribe with Whisper, then send the customer an editable call summary — a thank-you, what was discussed, agreed next steps and anything still to confirm. Name the company and customer speakers for better transcripts and attribution.
+- **Call and meeting notes:** record the audio of WhatsApp voice and video calls, transcribe with your selected speech provider, then send the customer an editable call summary — a thank-you, what was discussed, agreed next steps and anything still to confirm. Name the company and customer speakers for better transcripts and attribution.
 - **Voice replies with AI polish:** dictate WhatsApp replies with speech-to-text, then polish the wording — professional, shorter, clearer or summarized — before pressing Send.
 - **Compact desk layout:** the composer, client details, automation chips, queue and call notes are designed to stay on screen without scrolling.
 - **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
-- **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
+- **Your keys, your control:** connect OpenAI, OpenRouter, Kimi (Moonshot), DeepSeek, Anthropic, Google Gemini or xAI Grok. Review drafts before sending and enable optional automation only when you are ready.
 
 ## Install — no coding needed
 
@@ -27,7 +27,7 @@ Bring your own **OpenAI API key** and business information. No API key, customer
 3. In desktop Chrome, open `chrome://extensions` and turn on **Developer mode**.
 4. Click **Load unpacked** and select **`WhatsApp Desk/releases/WhatsApp-Desk`** inside the unzipped download.
 5. Open or refresh [WhatsApp Web](https://web.whatsapp.com). Desk AI appears on the right.
-6. Open **Settings**, enter your own OpenAI API key, and choose **Save key & connect**. Select a compatible model available to your project.
+6. Open **Settings**, choose a provider for each AI task, enter your own provider API key and save. Refresh the model list or enter a compatible model ID.
 7. Set your business name and reply style, then add approved documents or notes in **Knowledge**.
 8. Open an individual chat and choose **Draft a reply**. Review the draft in WhatsApp before sending.
 
@@ -64,7 +64,7 @@ The same panel design ships in Desk AI; these captures are shown in the MG Desk 
 ## What it does
 
 - **Business knowledge:** add PDF, DOCX, TXT, Markdown, CSV or JSON files, or write notes. Text extraction happens locally. Scanned PDFs need OCR first. Maximum 10 MB and 300,000 extracted characters per document; 2 million characters across the library.
-- **AI replies:** grounded drafts use relevant business excerpts and up to 35 recent visible messages. Models must support Responses and structured output; picture understanding also requires image input.
+- **AI replies:** grounded drafts use relevant business excerpts and up to 35 recent visible messages. Choose independent providers and models for replies/general assistant, picture understanding, polish, call summaries and transcription. Compatibility depends on the selected model.
 - **Pictures and screenshots:** include up to six loaded images per draft, resized to a maximum 2048 px edge. Receipts can be read and compared with approved payment details; images cannot independently verify payment or authenticity. Unclear or mismatched images require review.
 - **Client workspace:** local notes, stages, human takeover controls and a follow-up queue with review reminders and optional automatic sending.
 - **24-hour response timer:** a live hours/minutes/seconds countdown from the latest observed incoming customer message. Business replies do not restart it. It is a workflow aid, not a connection to the WhatsApp Business Platform.
@@ -72,17 +72,17 @@ The same panel design ships in Desk AI; these captures are shown in the MG Desk 
 
 ## Privacy and keys
 
-The key is entered at runtime and saved in `chrome.storage.local`, restricted to trusted extension contexts. It is not synced, returned in panel state or passed to the WhatsApp webpage. The extension sends it to OpenAI as the authentication header. Local storage is not independently encrypted; someone with access to the browser profile or extension developer tools may retrieve it. **Settings → Remove saved key** clears it.
+Provider keys are entered at runtime and saved in `chrome.storage.local`, restricted to trusted extension contexts. They are not synced, returned in panel state or passed to the WhatsApp webpage. The extension sends each key to its selected provider as required for authentication. Local storage is not independently encrypted; someone with access to the browser profile or extension developer tools may retrieve credentials. Remove saved keys in Settings.
 
-AI drafting sends relevant business knowledge, recent visible chat messages and included pictures directly to `api.openai.com`. Requests use `store: false`; OpenAI's API data policies still apply. There is no hosted application backend, analytics or remotely loaded JavaScript. Knowledge, notes and follow-ups belong to this browser profile. Removing the extension clears its local data.
+When you run a task, the selected provider receives only the data needed for that task. Drafting can send relevant business excerpts, recent visible chat messages and included pictures; image understanding requires a compatible model. Polishing sends only the selected operator text. Call summaries send the transcript and the business/participant/speaker names you provide. Dictation and call transcription send audio after you start those actions. Each provider's privacy, retention and usage terms apply. The extension does not send AI content to the licensing service and does not load remote JavaScript. Knowledge, notes, follow-ups, settings and keys belong to this browser profile. Removing the extension clears its local data.
 
-Optional voice dictation starts only when you click the microphone and grant browser access. The recording is sent to OpenAI for transcription using your saved key; it is not saved by the extension. The transcript appears in the editable panel and syncs to the selected WhatsApp composer. You can polish it as professional, shorter, clearer or summarized text; review the result and press WhatsApp's Send button yourself. Changes in the panel mirror to the composer only while it still matches the text Desk last placed. Typed AI questions and suggestions remain in the panel.
+Optional voice dictation starts only when you click the microphone and grant browser access. The recording is sent to the provider selected for dictation transcription; it is not saved by the extension. The transcript appears in the editable panel and syncs to the selected WhatsApp composer. You can polish it with the independently selected polish route; review the result and press WhatsApp's Send button yourself. Changes in the panel mirror to the composer only while it still matches the text Desk last placed. Typed AI questions and suggestions remain in the panel.
 
 A panel-only suggestion for the open chat has an **Insert into chat** button that places it in WhatsApp's empty message box for review. It uses the same compare-and-set write as dictation, refuses a box that already has text, and never sends the message.
 
-Call recording is a separate action you start manually during an active WhatsApp Web call. Chrome asks you to choose the WhatsApp tab and enable **Share audio**; the extension records that tab audio together with your microphone, for up to 60 minutes and 20 MiB. No video is recorded, and the audio is not saved by the extension. You can name the company and customer speakers for a better transcript and summary. After you stop, the audio is sent to OpenAI for transcription together with any business, participant and speaker names you provided as a transcription hint; for the optional customer-facing call summary the transcript text, your configured business name and the participant and speaker names are sent to OpenAI. The transcript and summary stay editable in the panel and can sync only to the original caller chat while the WhatsApp composer still matches the last synchronized text. Nothing is sent automatically.
+Call recording is a separate action you start manually during an active WhatsApp Web call. Chrome asks you to choose the WhatsApp tab and enable **Share audio**; the extension records that tab audio together with your microphone, for up to 60 minutes and 20 MiB. No video is recorded, and the audio is not saved by the extension. You can name the company and customer speakers for a better transcript and summary. After you stop, the audio is sent to the provider selected for call transcription with any business, participant and speaker names used as transcription hints. For the optional customer-facing summary, the transcript and names are sent to the separately selected summary provider. The transcript and summary stay editable in the panel and can sync only to the original caller chat while the WhatsApp composer still matches the last synchronized text. Nothing is sent automatically.
 
-Only OpenAI keys are supported currently. API usage is charged to the key owner's account, [separately from a ChatGPT subscription](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). Never put a real key in source code, screenshots, issues or shared files.
+OpenAI, OpenRouter, Kimi (Moonshot), DeepSeek, Anthropic, Google Gemini and xAI Grok API credentials are supported. Which models and tasks work depends on provider access and model capabilities; see [AI providers and model routing](docs/ai-providers.md). API usage is charged by the applicable provider/account and does not come with this extension. OpenAI API billing is [separate from a ChatGPT subscription](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). Desk AI does not currently offer Sign in with ChatGPT or ChatGPT-plan inference. It does not generate images or speech audio (TTS). Never put a real key in source code, screenshots, issues or shared files.
 
 ## Practical limits
 
@@ -107,7 +107,7 @@ Load the generated `dist/` folder through Chrome's **Load unpacked** button. For
 npm run dev -- --port 4187
 ```
 
-Open `http://127.0.0.1:4187`. The preview cannot save a real API key, call OpenAI or send WhatsApp messages.
+Open `http://127.0.0.1:4187`. The preview cannot save real provider credentials, call AI providers or send WhatsApp messages.
 
 `npm run check` runs TypeScript, unit/integration tests and the production build. Tests cover local key isolation, fresh-install defaults, knowledge retrieval, image/receipt handling, chat identity, composer insertion, inbox monitoring, reply timing and automatic-send safeguards.
 
@@ -130,9 +130,9 @@ Outputs:
 
 
 
-## Roadmap
+## Provider implementation notes
 
-- On-device / local AI transcription and drafting, to reduce per-message OpenAI API costs for users.
+See [AI providers and model routing](docs/ai-providers.md) for task routes, capability limits, data flows and the status of ChatGPT plan usage. The [multi-provider implementation plan](docs/multi-provider-plan.md) records the compatibility matrix and release verification gates.
 
 ## Contributing and license
 

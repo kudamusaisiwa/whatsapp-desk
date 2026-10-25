@@ -34,11 +34,25 @@ Features:
 - Human takeover controls and manual review before sending.
 - A seven-day trial, then a one-time $9.99 USD unlock through Stripe Checkout.
 
-Bring your own OpenAI API key. Desk AI for WhatsApp Web does not include or resell OpenAI
-credits. The key and local workspace stay in your Chrome profile; selected
-conversation content, business excerpts and images are sent directly to
-OpenAI only when you request a draft. The Chrome Web Store edition keeps
-automatic sending disabled and requires you to review and click Send.
+Bring your own API credentials for OpenAI, OpenRouter, Kimi (Moonshot),
+DeepSeek, Anthropic, Google Gemini or xAI Grok. Desk AI for WhatsApp Web does
+not include or resell provider usage credits. Credentials and the local
+workspace stay in your Chrome profile. For each task, selected conversation
+content, business excerpts, images or audio are sent directly from the trusted
+extension worker to the provider you selected. Text polishing sends only the
+selected operator text; call summaries send transcript text and names you
+provide; transcription sends audio after you start it. Provider privacy and
+retention terms apply. The extension does not send AI content to the licensing
+service. The Chrome Web Store edition keeps automatic sending disabled and
+requires you to review and click Send.
+
+Model and task compatibility varies. Image understanding requires a compatible
+model. OpenAI, OpenRouter and Google Gemini transcription adapters are
+supported in this release; other providers do not support speech transcription
+in this version.
+Image generation, text-to-speech and Sign in with ChatGPT/ChatGPT-plan usage
+are not included. API usage is billed by the applicable provider; OpenAI API
+billing is separate from a ChatGPT subscription.
 
 Desk AI for WhatsApp Web is an independent open-source project by Kudakwashe Musasiwa. It
 is not affiliated with, endorsed by, or produced by Meta or WhatsApp.
@@ -49,12 +63,13 @@ is not affiliated with, endorsed by, or produced by Meta or WhatsApp.
 - **Data used:** visible WhatsApp conversation/contact details, user-provided
   business documents and notes, selected images, follow-ups, settings,
   optional call recordings and transcripts with user-supplied participant and
-  speaker names, and the user-provided OpenAI API key.
-- **Data transfer:** selected draft context, optional dictation and call
-  audio, transcripts and user-supplied names go directly to `api.openai.com`
-  using the user's key. Stripe receives payment details through hosted
+  speaker names, and user-provided provider API keys.
+- **Data transfer:** selected task data goes directly to the provider selected
+  for that task using the user's key. Supported providers are OpenAI,
+  OpenRouter, Kimi (Moonshot), DeepSeek, Anthropic, Google Gemini and xAI Grok.
+  Stripe receives payment details through hosted
   Checkout. The licensing service receives an installation identifier and
-  license status, not conversations, recordings or the OpenAI key.
+  license status, not conversations, recordings or provider keys.
 - **Data sale:** none.
 - **Authentication:** no WhatsApp or Meta credentials are collected by the
   extension; WhatsApp Web's own QR linking flow is used.
@@ -63,14 +78,14 @@ is not affiliated with, endorsed by, or produced by Meta or WhatsApp.
 
 - Privacy policy: `https://whatsapp-desk-license-site.bakani.workers.dev/privacy.html`
 - Terms and refunds: `https://whatsapp-desk-license-site.bakani.workers.dev/terms.html`
-- Support tracker: `https://github.com/kudamusasiwa/whatsapp-desk/issues`
+- Support tracker: `https://github.com/kudamusaisiwa/whatsapp-desk/issues`
 
 ## Reviewer test notes
 
 1. Open `https://web.whatsapp.com` and link a test account with WhatsApp's QR
    flow.
 2. Load the Web Store ZIP with Chrome's extension test tools.
-3. Open Settings, enter the tester's own OpenAI API key, save it, and add a
+3. Open Settings, connect the tester's own provider API key, save it, and add a
    small business note or document.
 4. Open an individual chat and click **Draft a reply**.
 5. Confirm that a draft appears in the WhatsApp composer and that no Send click

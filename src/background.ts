@@ -21,7 +21,7 @@ import {
   RECEIPT_SCHEMA,
   type CapturedImage,
 } from "./media";
-import { automationBlock, extractResponse, selectKnowledge } from "./core";
+import { automationBlock, selectKnowledge } from "./core";
 import {
   CALL_SUMMARY_FORMAT,
   CALL_SUMMARY_INSTRUCTIONS,
@@ -48,6 +48,21 @@ import {
 } from "./license";
 import { STORE_RELEASE } from "./release";
 import { transcribeAudio } from "./transcription";
+import {
+  defaultRoutes,
+  normalizeRoutes,
+  invalidRouteTasks,
+  providerEndpoint,
+  providerHeaders,
+  providerModels,
+  providerRequest,
+  providerText,
+  routeSupports,
+  PROVIDERS,
+  type AiRoute,
+  type AiTask,
+  type ProviderId,
+} from "./providers";
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 function mutate<T>(fn: () => Promise<T>): Promise<T> {
@@ -65,11 +80,15 @@ const ready = (async () => {
   const old = await chrome.storage.local.get([
     "settings",
     "knowledge",
+    "apiKey",
+    "providerKeys",
   ]);
   const settings = {
     ...DEFAULT_SETTINGS,
     ...((old.settings as Partial<Settings>) ?? {}),
   };
+  const oldSettings = (old.settings ?? {}) as Partial<Settings> & { aiRoutes?: unknown };
+  settings.aiRoutes = normalizeRoutes(oldSettings.aiRoutes, settings.model);
   if (
     old.settings &&
     typeof (old.settings as Partial<Settings>).allChats !== "boolean"
@@ -82,6 +101,9 @@ const ready = (async () => {
   if (STORE_RELEASE) settings.autoSend = false;
   await chrome.storage.local.set({
     settings,
+    ...(old.apiKey && !(old.providerKeys as any)?.openai
+      ? { providerKeys: { ...((old.providerKeys as Record<string, string>) ?? {}), openai: old.apiKey } }
+      : {}),
   });
 })();
 const safeError = (e: unknown) =>
@@ -105,16 +127,71 @@ async function data() {
     "models",
     "apiKey",
     "ledger",
+    "providerKeys",
+    "providerModels",
   ]);
+  const settings = d.settings as Settings & { aiRoutes?: unknown };
+  const aiRoutes = normalizeRoutes(settings.aiRoutes, settings.model);
+  const providerKeys = { ...((d.providerKeys ?? {}) as Partial<Record<ProviderId, string>>) };
+  if (d.apiKey && !providerKeys.openai) providerKeys.openai = d.apiKey as string;
+  const selectedProvider = aiRoutes.text.provider;
   return {
-    settings: d.settings as Settings,
+    settings: { ...settings, aiRoutes } as Settings,
     knowledge: (d.knowledge ?? []) as Knowledge[],
     clients: (d.clients ?? {}) as Record<string, Client>,
     followUps: (d.followUps ?? []) as FollowUp[],
-    models: (d.models ?? []) as string[],
+    models: ((d.providerModels as any)?.[selectedProvider] ?? d.models ?? []) as string[],
     apiKey: (d.apiKey ?? "") as string,
+    providerKeys,
+    providerModels: (d.providerModels ?? {}) as Partial<Record<ProviderId, string[]>>,
     ledger: (d.ledger ?? {}) as Record<string, { status: string; at: number }>,
   };
+}
+function taskRoute(d: Awaited<ReturnType<typeof data>>, task: AiTask): AiRoute {
+  return (d.settings as Settings & { aiRoutes?: Record<AiTask, AiRoute> }).aiRoutes![task];
+}
+function taskKey(d: Awaited<ReturnType<typeof data>>, task: AiTask): string {
+  return d.providerKeys[taskRoute(d, task).provider] ?? "";
+}
+function requireTaskKey(d: Awaited<ReturnType<typeof data>>, task: AiTask): AiRoute {
+  const route = taskRoute(d, task);
+  if (!routeSupports(route, task)) throw new Error(`The selected ${PROVIDERS.find((p) => p.id === route.provider)?.label} model does not support this task. Choose another model in Settings.`);
+  if (!taskKey(d, task)) throw new Error(`Add a ${PROVIDERS.find((p) => p.id === route.provider)?.label} API key in Settings to use ${task === "text" ? "the assistant" : task === "vision" ? "picture replies" : task === "polish" ? "text polishing" : task === "summary" ? "call summaries" : task === "stt" ? "voice input" : "call transcription"}.`);
+  return route;
+}
+async function requestAI(task: AiTask, body: unknown, dataSnapshot?: Awaited<ReturnType<typeof data>>): Promise<string> {
+  const d = dataSnapshot ?? await data();
+  const route = requireTaskKey(d, task);
+  const endpoint = providerEndpoint(route.provider, route.model);
+  const requestBody = providerRequest(route.provider, route.model, body, task);
+  let response: Response;
+  try {
+    response = await fetch(endpoint.url, {
+      method: "POST",
+      headers: providerHeaders(route.provider, taskKey(d, task)),
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(25000),
+    });
+  } catch (e) {
+    throw new Error(e instanceof Error && e.name === "TimeoutError"
+      ? `${PROVIDERS.find((p) => p.id === route.provider)?.label} took too long. Try again or choose a faster model.`
+      : `${PROVIDERS.find((p) => p.id === route.provider)?.label} could not be reached. Check your connection and try again.`);
+  }
+  if (!response.ok) {
+    const label = PROVIDERS.find((p) => p.id === route.provider)?.label ?? route.provider;
+    const messages: Record<number, string> = {
+      400: `This ${label} model could not process the request. Check that it supports the selected task and choose another model in Settings.`,
+      401: `The ${label} key was not accepted. Check the key in Settings.`,
+      403: `This ${label} account does not have access to the selected model.`,
+      404: `The selected ${label} model is unavailable. Refresh the model list in Settings.`,
+      429: `${label} usage or rate limit reached. Check billing or try again shortly.`,
+    };
+    throw new Error(messages[response.status] ?? `${label} is temporarily unavailable (${response.status}). Try again shortly.`);
+  }
+  let result: any;
+  try { result = await response.json(); }
+  catch { throw new Error(`${PROVIDERS.find((p) => p.id === route.provider)?.label} returned an invalid response. Try again.`); }
+  return providerText(route.provider, result);
 }
 const sessionKey = (tabId: number) => `context:${tabId}`;
 async function contextFor(tabId: number): Promise<ChatContext | null> {
@@ -325,40 +402,6 @@ async function waitToSend(
     );
   } while (true);
 }
-async function api(path: string, key: string, body?: unknown) {
-  let response: Response;
-  try {
-    response = await fetch(`https://api.openai.com/v1/${path}`, {
-      method: body ? "POST" : "GET",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        ...(body ? { "Content-Type": "application/json" } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(25000),
-    });
-  } catch (e) {
-    throw new Error(
-      e instanceof Error && e.name === "TimeoutError"
-        ? "OpenAI took too long. Try again or choose a faster model."
-        : "OpenAI could not be reached. Check your connection and try again.",
-    );
-  }
-  if (!response.ok) {
-    const messages: Record<number, string> = {
-      400: "This model could not process the request. Choose a model in Settings that supports Responses, structured output and image input.",
-      401: "The OpenAI key was not accepted. Check the key in Settings.",
-      403: "This OpenAI project does not have access to the selected model.",
-      404: "The selected model is unavailable. Refresh the model list in Settings.",
-      429: "OpenAI usage or rate limit reached. Check billing or try again shortly.",
-    };
-    throw new Error(
-      messages[response.status] ??
-        `OpenAI is temporarily unavailable (${response.status}). Try again shortly.`,
-    );
-  }
-  return response.json();
-}
 const POLISH_STYLES = ["professional", "shorten", "clarify", "summarize"] as const;
 type PolishStyle = (typeof POLISH_STYLES)[number];
 const POLISH_GUIDANCE: Record<PolishStyle, string> = {
@@ -369,6 +412,7 @@ const POLISH_GUIDANCE: Record<PolishStyle, string> = {
 };
 const CALL_TRANSCRIPT_MAX_CHARS = 100_000;
 const CALL_TRANSCRIPTION_AUDIO_MAX_BYTES = 20 * 1024 * 1024;
+const MAX_DICTATION_AUDIO_BYTES = 10 * 1024 * 1024;
 async function summarizeCall(
   text: string,
   meta: { name?: unknown; startedAt?: unknown; speakers?: unknown },
@@ -376,13 +420,13 @@ async function summarizeCall(
   if (!text.trim() || text.length > CALL_TRANSCRIPT_MAX_CHARS)
     throw new Error("The call transcript must contain 1 to 100,000 characters.");
   const d = await data();
-  if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to summarize a call.");
+  requireTaskKey(d, "summary");
   const participants = callParticipants({
     businessName: d.settings.businessName,
     customerName: meta.name,
   });
   const speakers = callSpeakers(meta.speakers);
-  const response = await api("responses", d.apiKey, {
+  const response = await requestAI("summary", {
     model: d.settings.model,
     store: false,
     instructions: CALL_SUMMARY_INSTRUCTIONS,
@@ -396,9 +440,9 @@ async function summarizeCall(
     ],
     max_output_tokens: 4000,
     text: { format: CALL_SUMMARY_FORMAT },
-  });
+  }, d);
   let raw: unknown;
-  try { raw = JSON.parse(extractResponse(response)); }
+  try { raw = JSON.parse(response); }
   catch { throw new Error("The selected model returned an invalid call summary. Try again."); }
   return {
     text: renderCallSummary(
@@ -414,17 +458,17 @@ async function polishText(text: string, style: PolishStyle): Promise<{ text: str
     throw new Error("Enter text with 1 to 5,000 characters to polish.");
   if (!POLISH_STYLES.includes(style)) throw new Error("Choose a valid polish style.");
   const d = await data();
-  if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to polish text.");
-  const response = await api("responses", d.apiKey, {
+  requireTaskKey(d, "polish");
+  const response = await requestAI("polish", {
     model: d.settings.model,
     store: false,
     instructions: `You edit only the operator-provided text. ${POLISH_GUIDANCE[style]} Preserve meaning and every stated fact, amount, name, date, commitment, question, request and negation. Do not invent or imply services, legal, tax, payment, approval or business claims. Do not answer the text or add context. Return only the edited text in the required JSON object.`,
     input: [{ role: "user", content: [{ type: "input_text", text }] }],
     max_output_tokens: 6000,
     text: { format: { type: "json_schema", name: "polished_text", strict: true, schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false } } },
-  });
+  }, d);
   let result: unknown;
-  try { result = JSON.parse(extractResponse(response)).text; }
+  try { result = JSON.parse(response).text; }
   catch { throw new Error("The selected model returned an invalid text edit. Try again."); }
   if (typeof result !== "string" || !result.trim() || result.length > 5000)
     throw new Error("The selected model returned text outside the 5,000 character limit. Try again.");
@@ -738,8 +782,6 @@ async function generateReply(
     throw new Error(
       "Choose an individual client conversation. Group replies are not supported.",
     );
-  if (!d.apiKey)
-    throw new Error("Add your OpenAI key in Settings to start drafting.");
   if (automatic && !d.knowledge.length)
     throw new Error(
       "Add your business knowledge first so replies use your information.",
@@ -796,8 +838,9 @@ async function generateReply(
     })),
     captured,
   );
-  const response = await api("responses", d.apiKey, {
-    model: d.settings.model,
+  const task = vision.hasImages ? "vision" : "text";
+  requireTaskKey(d, task);
+  const response = await requestAI(task, {
     store: false,
     instructions: replyInstructions(d.settings, automatic ? "" : manualTask, assistOnly),
     input: vision.input,
@@ -835,10 +878,10 @@ async function generateReply(
         },
       },
     },
-  });
+  }, d);
   let output: any;
   try {
-    output = JSON.parse(extractResponse(response));
+    output = JSON.parse(response);
   } catch {
     throw new Error(
       "The model did not return a complete reply. Try again or choose another model.",
@@ -1098,7 +1141,7 @@ async function recordContext(raw: ChatContext | null, tabId: number) {
     !!d.ledger[
       `send:reply:${context.chatId}:${context.lastIncomingId}:part:1`
     ] ||
-    !d.apiKey ||
+    !taskKey(d, "text") ||
     !d.knowledge.length ||
     automationBlock(context, d.clients[context.chatId]?.human ?? false)
   )
@@ -1246,7 +1289,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
       d.settings.allChats &&
       d.settings.autoDraft &&
       d.settings.autoSend &&
-      !!d.apiKey &&
+      !!taskKey(d, "text") &&
       !!d.knowledge.length;
     if (!configured)
       return {
@@ -1516,7 +1559,9 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
         clients: d.clients,
         followUps: d.followUps,
         models: d.models,
-        hasKey: !!d.apiKey,
+        hasKey: !!taskKey(d, "text"),
+        providerStatus: Object.fromEntries(PROVIDERS.map((p) => [p.id, !!d.providerKeys[p.id]])),
+        providerModels: d.providerModels,
         context,
         draft:
           (context
@@ -1546,6 +1591,10 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
       await mutate(async () => {
         const d = await data();
         const p = m.settings ?? {};
+        const existingRoutes = { ...((d.settings as Settings & { aiRoutes?: Record<AiTask, AiRoute> }).aiRoutes ?? defaultRoutes(d.settings.model)) };
+        const proposedRoutes = p.aiRoutes && typeof p.aiRoutes === "object" ? { ...existingRoutes, ...p.aiRoutes } : p.aiRoutes;
+        const invalidRoutes = invalidRouteTasks(proposedRoutes);
+        if (invalidRoutes.length) throw new Error(`Choose a supported provider and model for ${invalidRoutes.join(", ")}.`);
         const s: Settings = {
           businessName: String(p.businessName ?? d.settings.businessName).slice(
             0,
@@ -1555,6 +1604,11 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
             p.businessInstructions ?? d.settings.businessInstructions,
           ).slice(0, 6000),
           model: String(p.model ?? d.settings.model).slice(0, 150),
+          aiRoutes: normalizeRoutes(proposedRoutes ?? (() => {
+            const current = existingRoutes;
+            if (p.model !== undefined && current.text.provider === "openai") current.text = { provider: "openai", model: String(p.model).slice(0, 150) };
+            return current;
+          })(), String(p.model ?? d.settings.model)),
           autoSend:
             STORE_RELEASE
               ? false
@@ -1574,6 +1628,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
                 ? "DMY"
                 : d.settings.dateOrder,
         };
+        s.model = normalizeRoutes(s.aiRoutes, s.model).text.model;
         await chrome.storage.local.set({ settings: s });
         const tabs = await chrome.tabs.query({
           url: "https://web.whatsapp.com/*",
@@ -1596,35 +1651,38 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
     }
     case "SAVE_KEY": {
       const key = String(m.key ?? "").trim();
-      if (key && !/^sk-[\w-]{12,}$/.test(key))
-        throw new Error("Enter a valid OpenAI secret key, starting with sk-.");
-      await chrome.storage.local.set({ apiKey: key, models: [] });
+      const provider: ProviderId = (m.provider === undefined ? "openai" : m.provider) as ProviderId;
+      if (!PROVIDERS.some((p) => p.id === provider)) throw new Error("Choose a supported AI provider.");
+      if (key && (!/^[A-Za-z0-9._-]{12,300}$/.test(key) || (provider === "openai" && !/^sk-[\w-]{12,}$/.test(key))))
+        throw new Error(provider === "openai" ? "Enter a valid OpenAI secret key, starting with sk-." : "Enter a valid API key.");
+      const current = (await chrome.storage.local.get("providerKeys")).providerKeys as Partial<Record<ProviderId, string>> ?? {};
+      const providerKeys = { ...current, [provider]: key };
+      const providerModels = { ...((await chrome.storage.local.get("providerModels")).providerModels as Partial<Record<ProviderId, string[]>> ?? {}), [provider]: [] };
+      await chrome.storage.local.set({ providerKeys, providerModels, ...(provider === "openai" ? { apiKey: key, models: [] } : {}) });
       return {};
     }
     case "LOAD_MODELS": {
       const d = await data();
-      if (!d.apiKey) throw new Error("Save your OpenAI key first.");
-      const r = await api("models", d.apiKey);
-      const models = (r.data ?? [])
-        .map((x: any) => x.id as string)
-        .filter(
-          (id: string) =>
-            /^gpt-/.test(id) &&
-            !/(audio|realtime|transcribe|tts|image|search|instruct|codex)/.test(
-              id,
-            ),
-        )
-        .sort((a: string, b: string) =>
-          b.localeCompare(a, undefined, { numeric: true }),
-        );
-      await chrome.storage.local.set({ models });
+      const provider: ProviderId = m.provider === undefined ? "openai" : m.provider;
+      if (!PROVIDERS.some((p) => p.id === provider)) throw new Error("Choose a supported AI provider.");
+      const key = d.providerKeys[provider];
+      if (!key) throw new Error(`Save your ${PROVIDERS.find((p) => p.id === provider)?.label} key first.`);
+      const endpoint = providerEndpoint(provider);
+      let response: Response;
+      try { response = await fetch(endpoint.url, { method: "GET", headers: providerHeaders(provider, key, false), signal: AbortSignal.timeout(25000) }); }
+      catch { throw new Error(`${PROVIDERS.find((p) => p.id === provider)?.label} could not be reached to load models.`); }
+      if (!response.ok) throw new Error(`Could not load ${PROVIDERS.find((p) => p.id === provider)?.label} models (${response.status}). Check the key and try again.`);
+      const r = await response.json();
+      const models = providerModels(provider, r).filter((id) => provider !== "openai" || (/^gpt-/.test(id) && !/(audio|realtime|transcribe|tts|image|search|instruct|codex)/.test(id)));
+      const providerModelsById = { ...d.providerModels, [provider]: models };
+      await chrome.storage.local.set({ providerModels: providerModelsById, ...(provider === "openai" ? { models } : {}) });
       return { models };
     }
     case "TRANSCRIBE_AUDIO": {
       await assertLicenseAccess();
       const d = await data();
-      if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to use voice input.");
-      return transcribeAudio(m.audio, m.mimeType, d.apiKey);
+      const route = requireTaskKey(d, "stt");
+      return transcribeAudio(m.audio, m.mimeType, taskKey(d, "stt"), MAX_DICTATION_AUDIO_BYTES, 8000, undefined, route.provider, route.model);
     }
     case "CALL_RECORD_START":
       await assertLicenseAccess();
@@ -1639,7 +1697,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
     case "TRANSCRIBE_CALL": {
       await assertLicenseAccess();
       const d = await data();
-      if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to transcribe a call.");
+      const route = requireTaskKey(d, "callStt");
       const name = typeof m.name === "string" ? m.name.slice(0, 150) : undefined;
       const spk = callSpeakers(m.speakers);
       const hint = whisperCallPrompt({
@@ -1648,7 +1706,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
         customerName: name,
         customerSpeaker: spk.customer,
       });
-      return transcribeAudio(m.audio, m.mimeType, d.apiKey, CALL_TRANSCRIPTION_AUDIO_MAX_BYTES, CALL_TRANSCRIPT_MAX_CHARS, hint ?? undefined);
+      return transcribeAudio(m.audio, m.mimeType, taskKey(d, "callStt"), CALL_TRANSCRIPTION_AUDIO_MAX_BYTES, CALL_TRANSCRIPT_MAX_CHARS, hint ?? undefined, route.provider, route.model);
     }
     case "SUMMARIZE_CALL": {
       await assertLicenseAccess();

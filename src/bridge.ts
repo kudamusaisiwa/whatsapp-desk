@@ -1,4 +1,5 @@
-import { DEFAULT_SETTINGS, type DeskState, type GeneratePayload } from "./types";
+import { DEFAULT_SETTINGS, type DeskState, type GeneratePayload, type Settings } from "./types";
+import { normalizeRoutes } from "./providers";
 export const isExtension =
   typeof chrome !== "undefined" && !!chrome.runtime?.id;
 export const tabId = Number(new URLSearchParams(location.search).get("tabId"));
@@ -108,10 +109,17 @@ export async function rpc<T = any>(
   if (type === "GET_STATE") return s as T;
   if (["SAVE_KEY", "LOAD_MODELS", "GENERATE", "POLISH_TEXT", "SYNC_MESSAGE", "SUMMARIZE_CALL", "TRANSCRIBE_CALL"].includes(type) || type.startsWith("CALL_RECORD_"))
     throw new Error(
-      "This is the design preview. Load the extension in Chrome to connect OpenAI and draft in your real chats.",
+      "This is the design preview. Load the extension in Chrome to connect an AI provider and draft in your real chats.",
     );
-  if (type === "SAVE_SETTINGS")
-    s.settings = { ...s.settings, ...(payload.settings as object) };
+  if (type === "SAVE_SETTINGS") {
+    const patch = payload.settings as Partial<Settings>;
+    const routes = normalizeRoutes(s.settings.aiRoutes, s.settings.model);
+    s.settings = {
+      ...s.settings, ...patch,
+      aiRoutes: { ...routes, ...patch.aiRoutes },
+    };
+    s.settings.model = s.settings.aiRoutes!.text!.model;
+  }
   if (type === "UPDATE_CLIENT") {
     const id = payload.chatId as string;
     s.clients[id] = { ...s.clients[id], ...(payload.patch as object) };

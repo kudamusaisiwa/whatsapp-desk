@@ -1,82 +1,33 @@
-Desk AI for WhatsApp Web is an open-source Chrome extension, created by **Kudakwashe Musasiwa** and licensed under **MIT**.
+# Desk AI for WhatsApp Web v0.5.0
 
-![The Desk AI panel beside a WhatsApp Web conversation with call notes open](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/mg-desk-preview.png)
+Choose the AI provider and model for each part of your desk. This MIT-licensed open-source release is by **Kudakwashe Musasiwa**.
 
-*The shared Desk AI panel design inside WhatsApp Web, shown here in the MG Desk deployment.*
+## What changed
 
-## Feature highlights
+- Added OpenRouter, Kimi (Moonshot), DeepSeek, Anthropic, Google Gemini and xAI Grok alongside OpenAI.
+- Added independent saved routes for assistant replies, picture/receipt understanding, text polish, call summaries, voice dictation and call transcription.
+- Added separate local credentials and model discovery for each provider, with custom model IDs and clear errors for incompatible routes.
+- Preserved existing OpenAI setup, business knowledge, client notes, follow-ups and human-send defaults. Models must support the selected task; provider access and usage charges apply.
+- Updated setup guides, provider documentation, privacy disclosures and the public website.
 
-- **Live 24-hour response timer:** see hours, minutes and seconds remaining from the latest observed customer message, with clear open/closed status to help manage follow-ups.
-- **WhatsApp Business setup by QR code:** keep using your existing WhatsApp Business account through WhatsApp Web. Scan its QR code from your phone; Desk AI needs no Meta Business Manager or WhatsApp Cloud API setup.
-- **AI replies that know your business:** upload your services, prices, policies and FAQs, then draft answers grounded in your own documents.
-- **Picture and receipt understanding:** read loaded photos, screenshots and proofs of payment in the context of the conversation, with human review for unclear details or mismatches.
-- **Call and meeting notes:** record the audio of WhatsApp voice and video calls, transcribe with Whisper, then send the customer an editable call summary — a thank-you, what was discussed, agreed next steps and anything still to confirm. Name the company and customer speakers for better transcripts and attribution.
-- **Voice replies with AI polish:** dictate WhatsApp replies with speech-to-text, then polish the wording — professional, shorter, clearer or summarized — before pressing Send.
-- **Compact desk layout:** the composer, client details, automation chips, queue and call notes are designed to stay on screen without scrolling.
-- **Follow-ups and human takeover:** save client notes, schedule reminders and pause automation when a person needs to step in.
-- **Your key, your control:** bring your own OpenAI key, review drafts before sending and enable automatic replies only when you are ready.
+Images means understanding pictures and receipts already in a chat. Image generation and text-to-speech are not included. A receipt image cannot establish bank settlement.
 
-## Download this file
+## Install or update
 
-**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.4.0/WhatsApp-Desk.zip)** — this is the ready-to-install extension.
+**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.5.0/WhatsApp-Desk.zip)** and unzip it. In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, then select **WhatsApp Desk/releases/WhatsApp-Desk** inside the download. If updating an existing installation, replace its extension files in the same folder and press **Reload** to retain that extension's local workspace. Refresh WhatsApp Web.
 
-For Chrome Web Store submission, use **WhatsApp-Desk-WebStore.zip** from the
-same release. It has `manifest.json` at the ZIP root, keeps automatic sending
-off, and uses the deployed seven-day trial and one-time $9.99 hosted Stripe
-Payment Link. Do not upload the manual-install ZIP to the Web Store.
+In **Settings**, select a credential provider, save your own key, then configure each task's provider and model under **AI tasks and models**. Refresh model choices for your account or enter the exact model ID. Save workspace settings before using a changed route. Upload approved business knowledge and review drafts before sending.
 
-In the **Assets** section below, choose **WhatsApp-Desk.zip**. GitHub also shows **Source code (zip)** and **Source code (tar.gz)**: those are developer downloads and cannot be loaded straight into Chrome.
+The ZIP includes visual and plain-text setup guides, the MIT license and third-party notices. GitHub's Source code downloads are developer archives, not installable builds.
 
-## Install in Chrome
+## ChatGPT subscription assessment
 
-1. **Download WhatsApp-Desk.zip and unzip it.**
-2. Keep the extracted **WhatsApp Desk** folder somewhere permanent, such as Documents.
-3. Open **`chrome://extensions`** in Chrome and turn on **Developer mode**.
-4. Click **Load unpacked** and select this folder inside the unzipped download:
+OpenAI now documents ChatGPT plan usage for eligible local open-source apps. Desk AI does **not** yet include subscription sign-in: the documented flow requires a local callback listener and protected OAuth runtime, so a native companion is needed for this extension. API keys continue to use provider API billing. See [AI providers and ChatGPT feasibility](https://github.com/kudamusaisiwa/whatsapp-desk/blob/main/docs/ai-providers.md).
 
-   **`WhatsApp Desk/releases/WhatsApp-Desk`**
+## Verification and limits
 
-   Open **WhatsApp Desk** → **releases** → select **WhatsApp-Desk**.
-5. Open or refresh **[WhatsApp Web](https://web.whatsapp.com)**. The assistant appears on the right.
+All **198 automated tests** pass, including adapter, routing, storage and UI checks. TypeScript, production builds, ZIP integrity checks and built-folder/final-ZIP secret scans also pass. Test fixtures do not establish live provider acceptance or behavior in a recipient's Chrome/WhatsApp installation. No keys, browser profiles, customer conversations or business knowledge are included.
 
-On Mac, double-click the ZIP to unzip it. On Windows, right-click → **Extract All**. Keep Developer mode on and keep the extracted folder. No coding is needed.
+The Web Store asset is packaged separately with automatic sending disabled. A GitHub release does not submit or publish a Chrome Web Store update.
 
-**“Manifest file is missing or unreadable”?** Click **Cancel**, then **Load unpacked** again and select **`WhatsApp Desk/releases/WhatsApp-Desk`**.
-
-Requires desktop Chrome 120 or later. A managed work browser may require IT approval.
-
-### Link your WhatsApp Business account
-
-Open [WhatsApp Web](https://web.whatsapp.com). On your phone, open **WhatsApp Business → Linked devices → Link a device**, then scan the QR code shown on your computer. After linking, the extension works beside your chats. See [WhatsApp’s official QR linking guide](https://faq.whatsapp.com/878854700132604/) for the phone-specific steps.
-
-## Installation examples
-
-These examples show Dia with the earlier MG Desk name. For Chrome, open `chrome://extensions` and use the **Developer mode** and **Load unpacked** controls shown below.
-
-**1. Turn on Developer mode.**
-
-![Enable Developer mode in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/enable-developer-mode.png)
-
-**2. Click Load unpacked, then select `WhatsApp Desk/releases/WhatsApp-Desk`.**
-
-![Click Load unpacked in the extensions page](https://raw.githubusercontent.com/kudamusaisiwa/whatsapp-desk/main/docs/images/load-unpacked.png)
-
-## Connect your key and business
-
-1. Create your own key on the **[OpenAI API keys page](https://platform.openai.com/api-keys)** and set up API billing. API usage is charged separately from a ChatGPT subscription.
-2. In Desk AI for WhatsApp Web, open **Settings**, paste your key and click **Save key & connect**.
-3. Select a model available to your project that supports Responses and structured output; images also require image input. Enter your business name, set the date order to match WhatsApp and click **Save workspace settings**.
-4. In **Knowledge**, upload your approved business documents or write a note about your services, prices, hours and policies.
-5. Open an individual conversation and choose **Draft a reply**. Review or edit it in the WhatsApp message box before sending.
-
-The extension starts with **no key or business knowledge**. **Auto-send, Draft as messages arrive and Reply across all chats start off.**
-
-The extracted **WhatsApp Desk** folder includes **START-HERE.html** and **START-HERE.txt**. The ZIP layout and guides now use the exact folder path above; the extension code is v0.3.3 and the Chrome name is **Desk AI for WhatsApp Web**.
-
-## Included and privacy
-
-AI reply drafts, local business knowledge, picture/screenshot understanding, client notes, follow-ups and optional automatic replies. Your key is stored locally in the extension; drafting sends relevant business/chat information and included images directly to OpenAI. See the [README](https://github.com/kudamusaisiwa/whatsapp-desk#privacy-and-keys) for storage details and practical limits.
-
-Copyright (c) 2026 **Kudakwashe Musasiwa**, initial author. The ZIP includes the MIT license and third-party notices. This is an independent project, not an official Meta/WhatsApp product.
-
-The extension code passed TypeScript and 90 automated tests. The refreshed package passes the production build, built-folder/ZIP secret scans and ZIP integrity checks. No secrets were detected. Live behavior on a recipient’s Chrome/WhatsApp installation still needs to be checked after setup. The matching SHA-256 checksum and scan summary are attached below.
+SHA-256 checksums and package audit inventories accompany the extension assets. Report issues in the [public tracker](https://github.com/kudamusaisiwa/whatsapp-desk/issues).

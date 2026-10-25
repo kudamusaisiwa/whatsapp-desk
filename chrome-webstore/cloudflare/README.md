@@ -4,7 +4,10 @@ This Worker serves the Desk AI for WhatsApp Web landing page, the privacy/terms 
 and the small licensing API used by the Chrome Web Store build. Workers Static
 Assets serves `public/`; D1 stores installation and verified-payment state.
 Stripe Checkout is hosted by a Payment Link. The Worker only receives signed
-webhooks; no Stripe API key or OpenAI secret belongs in the extension ZIP.
+webhooks; no Stripe credential, provider API key or ChatGPT token belongs in
+the extension ZIP or licensing service. AI requests go directly from the
+trusted extension worker to the provider selected for each task; the site and
+licensing service do not process AI requests.
 
 ## One-time setup
 

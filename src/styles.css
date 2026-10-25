@@ -1318,6 +1318,29 @@ input::placeholder {
   vertical-align: -2px;
   margin-right: 4px;
 }
+.provider-routes > .settings-body { gap: 12px; }
+.provider-route {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-2);
+}
+.provider-route-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.provider-route-heading > div { display: grid; gap: 3px; }
+.provider-route-heading strong { font-size: 13px; }
+.provider-route-heading small { color: var(--text-3); line-height: 1.45; }
+.provider-route-heading .text-button { flex: 0 0 auto; }
+.provider-route .field-hint { margin: 0; }
+.provider-route select { margin-top: 5px; }
+.provider-route .model-custom { margin-top: 0; }
+.provider-route a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
 
 .setup-checklist {
   background: var(--surface);

@@ -146,36 +146,36 @@ const choose = (win: any, select: HTMLSelectElement, value: string) => {
   select.dispatchEvent(new win.Event("change", { bubbles: true }));
 };
 
-test("Settings saves only the changed fields, never stale automation values", async () => {
+test("Settings saves only the changed provider route, never stale automation values", async () => {
   const p = mountPanel();
   try {
     await tick(80);
     await p.tab("Settings");
     assert.equal(p.q(".settings-savebar"), null);
-    choose(p.dom.window, p.q<HTMLSelectElement>("select[aria-label='Model']")!, "gpt-4.1");
+    choose(p.dom.window, p.q<HTMLSelectElement>("select[aria-label='Assistant replies model']")!, "gpt-4.1-mini");
     await tick();
     p.fixture.settings.autoSend = true;
     await p.refresh();
-    assert.equal(p.q<HTMLSelectElement>("select[aria-label='Model']")!.value, "gpt-4.1");
+    assert.equal(p.q<HTMLSelectElement>("select[aria-label='Assistant replies model']")!.value, "gpt-4.1-mini");
     p.q<HTMLButtonElement>(".settings-savebar button[type='submit']")!.click();
     await tick(80);
     const saves = p.requests.filter((r) => r.type === "SAVE_SETTINGS");
     assert.equal(saves.length, 1);
-    assert.deepEqual(plain(saves[0].settings), { model: "gpt-4.1" });
+    assert.deepEqual(plain(saves[0].settings), { aiRoutes: { text: { provider: "openai", model: "gpt-4.1-mini" } }, model: "gpt-4.1-mini" });
     assert.equal(p.fixture.settings.autoSend, true);
     assert.equal(p.q(".settings-savebar"), null);
   } finally { p.close(); }
 });
 
-test("a custom model ID is entered in its own field and saved alone", async () => {
+test("a custom model ID is entered for its task and saved with that route", async () => {
   const p = mountPanel();
   try {
     await tick(80);
     await p.tab("Settings");
-    assert.equal(p.q("input[aria-label='Custom model ID']"), null);
-    choose(p.dom.window, p.q<HTMLSelectElement>("select[aria-label='Model']")!, "__custom__");
+    assert.equal(p.q("input[aria-label='Assistant replies custom model ID']"), null);
+    choose(p.dom.window, p.q<HTMLSelectElement>("select[aria-label='Assistant replies model']")!, "__custom__");
     await tick();
-    const custom = () => p.q<HTMLInputElement>("input[aria-label='Custom model ID']")!;
+    const custom = () => p.q<HTMLInputElement>("input[aria-label='Assistant replies custom model ID']")!;
     assert.equal(custom().value, DEFAULT_SETTINGS.model);
     assert.equal(custom().required, true);
     p.typeInto(custom(), "");
@@ -190,7 +190,49 @@ test("a custom model ID is entered in its own field and saved alone", async () =
     await tick(80);
     const saves = p.requests.filter((r) => r.type === "SAVE_SETTINGS");
     assert.equal(saves.length, 1);
-    assert.deepEqual(plain(saves[0].settings), { model: "my-model-x" });
+    assert.deepEqual(plain(saves[0].settings), { aiRoutes: { text: { provider: "openai", model: "my-model-x" } }, model: "my-model-x" });
+  } finally { p.close(); }
+});
+
+test("provider credentials are selected independently, never prefilled, and clear only the selected provider", async () => {
+  const p = mountPanel((fixture) => {
+    fixture.providerStatus = { openai: true, gemini: true, anthropic: false };
+  });
+  try {
+    await tick(80);
+    await p.tab("Settings");
+    const provider = p.q<HTMLSelectElement>("select[aria-label='Credential provider']")!;
+    choose(p.dom.window, provider, "gemini");
+    const key = p.q<HTMLInputElement>("input[aria-label='Google Gemini API key']")!;
+    assert.equal(key.value, "", "stored credentials are never put back in the field");
+    p.typeInto(key, "gemini-test-key");
+    p.q<HTMLButtonElement>("button.primary-button.full-button")!.click();
+    await tick(80);
+    const save = p.requests.find((r) => r.type === "SAVE_KEY");
+    assert.deepEqual(plain({ provider: save.provider, key: save.key }), { provider: "gemini", key: "gemini-test-key" });
+    assert.ok(p.requests.some((r) => r.type === "LOAD_MODELS" && r.provider === "gemini"));
+    assert.equal(p.q<HTMLInputElement>("input[aria-label='Google Gemini API key']")!.value, "");
+    p.q<HTMLButtonElement>("button.danger")!.click();
+    await tick(80);
+    const clears = p.requests.filter((r) => r.type === "SAVE_KEY");
+    assert.deepEqual(plain({ type: clears.at(-1).type, provider: clears.at(-1).provider, key: clears.at(-1).key }), { type: "SAVE_KEY", provider: "gemini", key: "" });
+    assert.equal(clears.some((r) => r.provider === "openai" && r.key === ""), false);
+  } finally { p.close(); }
+});
+
+test("voice dictation is enabled when its selected STT provider is ready even if text is not", async () => {
+  const p = mountPanel((fixture) => {
+    fixture.hasKey = false;
+    fixture.providerStatus = { openai: true, openrouter: false };
+    fixture.settings.aiRoutes = {
+      text: { provider: "openrouter", model: "custom/chat-model" },
+      stt: { provider: "openai", model: "whisper-1" },
+    };
+  });
+  try {
+    await tick(80);
+    const mic = p.q<HTMLButtonElement>(".speech-input__toggle")!;
+    assert.equal(mic.disabled, false, "the text provider status does not gate STT");
   } finally { p.close(); }
 });
 
@@ -231,5 +273,23 @@ test("the store build requires manual sending: the chip is disabled and never sa
     const toggle = p.q<HTMLButtonElement>("button[role='switch'][aria-label='Manual sending is required']")!;
     assert.equal(toggle.disabled, true);
     assert.ok(p.q(".license-card"));
+  } finally { p.close(); }
+});
+
+
+test("picture routes select a compatible default while other task edits stay scoped", async () => {
+  const p = mountPanel();
+  try {
+    await tick(80);
+    await p.tab("Settings");
+    choose(p.dom.window, p.q<HTMLSelectElement>("select[aria-label='Pictures and POPs provider']")!, "deepseek");
+    await tick();
+    const models = p.q<HTMLSelectElement>("select[aria-label='Pictures and POPs model']")!;
+    assert.equal(models.value, "deepseek-flash");
+    assert.equal([...models.options].some((option) => option.value === "deepseek-v4-pro"), false);
+    p.q<HTMLButtonElement>(".settings-savebar button[type='submit']")!.click();
+    await tick(80);
+    const save = p.requests.find((request) => request.type === "SAVE_SETTINGS");
+    assert.deepEqual(plain(save.settings), { aiRoutes: { vision: { provider: "deepseek", model: "deepseek-flash" } } });
   } finally { p.close(); }
 });

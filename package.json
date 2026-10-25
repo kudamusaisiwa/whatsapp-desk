@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-desk",
-  "version": "0.4.0",
-  "description": "Open-source Desk AI assistant for WhatsApp Web with local business knowledge and bring-your-own OpenAI key",
+  "version": "0.5.0",
+  "description": "Open-source Desk AI assistant for WhatsApp Web with local knowledge and per-task AI providers",
   "scripts": {
     "dev": "vite",
     "build": "node scripts/build.mjs",
@@ -37,7 +37,7 @@
     "vite": "^8.3.5"
   },
   "private": true,
-  "homepage": "https://github.com/kudamusasiwa/whatsapp-desk",
+  "homepage": "https://github.com/kudamusaisiwa/whatsapp-desk",
   "repository": {
     "type": "git",
     "url": "https://github.com/kudamusaisiwa/whatsapp-desk.git"

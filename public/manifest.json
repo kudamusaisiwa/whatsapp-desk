@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Desk AI for WhatsApp Web",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Business knowledge, AI reply drafts, client follow-ups and a live response-window timer inside WhatsApp Web.",
   "minimum_chrome_version": "120",
   "permissions": [
@@ -12,7 +12,13 @@
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://openrouter.ai/*",
+    "https://api.moonshot.ai/*",
+    "https://api.deepseek.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.x.ai/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -54,6 +60,6 @@
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.openai.com; worker-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://api.openai.com https://openrouter.ai https://api.moonshot.ai https://api.deepseek.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.x.ai; worker-src 'self'"
   }
 }

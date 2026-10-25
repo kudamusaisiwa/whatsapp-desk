@@ -97,6 +97,29 @@ test("recording starts only after the click, shows both audio sources, then tran
   } finally { (dom.window as any).root.unmount(); dom.window.close(); }
 });
 
+test("call recording uses call transcription readiness even when the text provider is disconnected", async () => {
+  const requests: any[] = [];
+  const configured = state();
+  configured.hasKey = false;
+  configured.providerStatus = { openai: true, openrouter: false };
+  configured.settings.aiRoutes = {
+    text: { provider: "openrouter", model: "custom/chat" },
+    callStt: { provider: "openai", model: "whisper-1" },
+  };
+  const dom = setup((message) => {
+    requests.push(message);
+    return {};
+  }, configured);
+  try {
+    await tick();
+    const record = dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!;
+    assert.equal(record.disabled, false, "a disconnected text route does not disable configured call STT");
+    record.click();
+    await tick();
+    assert.equal(requests.some((request) => request.type === "CALL_RECORD_START"), true);
+  } finally { (dom.window as any).root.unmount(); dom.window.close(); }
+});
+
 test("tab picker denial leaves earlier notes intact and does not claim a recording", async () => {
   const dom=setup((message)=>{
     if(message.type==="CALL_RECORD_START") return {ok:false,error:"Tab sharing was cancelled."};
