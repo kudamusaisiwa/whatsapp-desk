@@ -71,6 +71,12 @@ The key is entered at runtime and saved in `chrome.storage.local`, restricted to
 
 AI drafting sends relevant business knowledge, recent visible chat messages and included pictures directly to `api.openai.com`. Requests use `store: false`; OpenAI's API data policies still apply. There is no hosted application backend, analytics or remotely loaded JavaScript. Knowledge, notes and follow-ups belong to this browser profile. Removing the extension clears its local data.
 
+Optional voice dictation starts only when you click the microphone and grant browser access. The recording is sent to OpenAI for transcription using your saved key; it is not saved by the extension. The transcript appears in the editable panel and syncs to the selected WhatsApp composer. You can polish it as professional, shorter, clearer or summarized text; review the result and press WhatsApp's Send button yourself. Changes in the panel mirror to the composer only while it still matches the text Desk last placed. Typed AI questions and suggestions remain in the panel.
+
+A panel-only suggestion for the open chat has an **Insert into chat** button that places it in WhatsApp's empty message box for review. It uses the same compare-and-set write as dictation, refuses a box that already has text, and never sends the message.
+
+Call recording is a separate action you start manually during an active WhatsApp Web call. Chrome asks you to choose the WhatsApp tab and enable **Share audio**; the extension records that tab audio together with your microphone, for up to 60 minutes and 20 MiB. No video is recorded, and the audio is not saved by the extension. You can name the company and customer speakers for a better transcript and summary. After you stop, the audio is sent to OpenAI for transcription together with any business, participant and speaker names you provided as a transcription hint; for the optional customer-facing call summary the transcript text, your configured business name and the participant and speaker names are sent to OpenAI. The transcript and summary stay editable in the panel and can sync only to the original caller chat while the WhatsApp composer still matches the last synchronized text. Nothing is sent automatically.
+
 Only OpenAI keys are supported currently. API usage is charged to the key owner's account, [separately from a ChatGPT subscription](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). Never put a real key in source code, screenshots, issues or shared files.
 
 ## Practical limits

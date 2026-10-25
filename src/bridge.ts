@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type DeskState } from "./types";
+import { DEFAULT_SETTINGS, type DeskState, type GeneratePayload } from "./types";
 export const isExtension =
   typeof chrome !== "undefined" && !!chrome.runtime?.id;
 export const tabId = Number(new URLSearchParams(location.search).get("tabId"));
@@ -87,17 +87,26 @@ function demoState(): DeskState {
 }
 export async function rpc<T = any>(
   type: string,
-  payload: Record<string, unknown> = {},
+  payload: Record<string, unknown> & Partial<GeneratePayload> = {},
 ): Promise<T> {
   if (isExtension) {
-    const r = await chrome.runtime.sendMessage({ type, tabId, ...payload });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let r: any;
+    try {
+      r = await Promise.race([
+        chrome.runtime.sendMessage({ type, tabId, ...payload }),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("The assistant took too long to respond. Try again.")), type === "CALL_RECORD_START" ? 180000 : type === "CALL_RECORD_STOP" ? 75000 : type === "TRANSCRIBE_CALL" ? 75000 : type === "TRANSCRIBE_AUDIO" ? 55000 : 40000);
+        }),
+      ]);
+    } finally { clearTimeout(timer); }
     if (!r?.ok)
       throw new Error(r?.error ?? "Could not connect. Refresh WhatsApp Web.");
     return r.value;
   }
   const s = demoState();
   if (type === "GET_STATE") return s as T;
-  if (type === "SAVE_KEY" || type === "LOAD_MODELS" || type === "GENERATE")
+  if (["SAVE_KEY", "LOAD_MODELS", "GENERATE", "POLISH_TEXT", "SYNC_MESSAGE", "SUMMARIZE_CALL", "TRANSCRIBE_CALL"].includes(type) || type.startsWith("CALL_RECORD_"))
     throw new Error(
       "This is the design preview. Load the extension in Chrome to connect OpenAI and draft in your real chats.",
     );

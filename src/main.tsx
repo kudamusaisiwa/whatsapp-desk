@@ -1,4 +1,6 @@
 import { APP_NAME, BRAND_PREFIX } from "./product";
+import { Assistant } from "./Assistant";
+import { CallRecorder, formatDuration, type CallStatus } from "./CallRecorder";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -30,6 +32,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  StickyNote,
   Trash2,
   UploadCloud,
   UserRound,
@@ -60,6 +63,27 @@ import "@fontsource/ibm-plex-mono/latin-400.css";
 import "./styles.css";
 
 type Tab = "assistant" | "followups" | "knowledge" | "settings";
+const CALL_PILL_PHASES: CallStatus["phase"][] = [
+  "starting",
+  "recording",
+  "stopped",
+  "transcribing",
+  "summarizing",
+];
+function callPillText(call: CallStatus, now: number) {
+  switch (call.phase) {
+    case "recording":
+      return `REC ${formatDuration(call.startedAt ? now - call.startedAt : 0)}`;
+    case "starting":
+      return "Starting call…";
+    case "stopped":
+      return "Call ended · finish";
+    case "transcribing":
+      return "Transcribing…";
+    default:
+      return "Summarizing…";
+  }
+}
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -155,8 +179,9 @@ function LicenseBanner({
 function App() {
   const [desk, setDesk] = useState<DeskState | null>(null);
   const [tab, setTab] = useState<Tab>("assistant");
+  const [call, setCall] = useState<CallStatus | null>(null);
+  const [callOpenSignal, setCallOpenSignal] = useState(0);
   const [toast, setToast] = useState("");
-  const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(Date.now());
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   async function refresh() {
@@ -217,44 +242,50 @@ function App() {
   const count = desk.followUps.filter(
     (f) => f.status === "pending" || f.status === "ready",
   ).length;
-  const draft =
-    desk.draft?.chatId === context?.chatId &&
-    desk.draft?.incomingId === context?.lastIncomingId
-      ? desk.draft
-      : null;
-  async function generate() {
-    setBusy(true);
-    try {
-      const d = await act("GENERATE");
-      notify(
-        d.placement === "Sent automatically"
-          ? "Reply sent automatically."
-          : "Reply placed in WhatsApp. Review it before sending.",
-      );
-    } catch {
-    } finally {
-      setBusy(false);
-    }
-  }
+  const chatOpen = context && client ? { context, client } : null;
+  const needsReview = !!desk.inbox?.items.some((i) => i.status === "review");
+  const callPill =
+    call && CALL_PILL_PHASES.includes(call.phase) ? callPillText(call, clock) : null;
   const panel = (
     <div className="desk">
       <header className="desk-header">
         <div className="wordmark">
           <span className="brand-mark">
-            <MessageCircle size={22} strokeWidth={1.9} />
+            <MessageCircle size={16} strokeWidth={1.9} />
             <i />
           </span>
-          <div>
-            <strong>
-              {BRAND_PREFIX} <span>AI for WhatsApp Web</span>
-            </strong>
-            <small>Your client companion</small>
-          </div>
+          <strong>
+            {BRAND_PREFIX} <span>AI for WhatsApp Web</span>
+          </strong>
         </div>
         <div className="header-tools">
-          <span className={`connection ${isExtension ? "" : "preview-status"}`}>
+          {call && callPill && (
+            <button
+              type="button"
+              className="call-pill"
+              data-phase={call.phase}
+              aria-label={`Call notes: ${callPill}. Open call notes.`}
+              onClick={() => {
+                setTab("assistant");
+                setCallOpenSignal((n) => n + 1);
+              }}
+            >
+              <i />
+              {callPill}
+            </button>
+          )}
+          <span
+            className={`connection ${isExtension ? "" : "preview-status"}`}
+            title={
+              isExtension
+                ? "Local workspace — data stays in this browser profile"
+                : "Design preview with sample data"
+            }
+          >
             <i />
-            {isExtension ? "Local workspace" : "Preview"}
+            <span className="connection-label">
+              {isExtension ? "Local" : "Preview"}
+            </span>
           </span>
           {isExtension && (
             <button
@@ -285,6 +316,12 @@ function App() {
               <Icon size={15} />
               <span>{label}</span>
               {id === "followups" && count > 0 && <b>{count}</b>}
+              {id === "assistant" && tab !== "assistant" && needsReview && (
+                <>
+                  <i className="tab-dot" aria-hidden="true" />
+                  <span className="sr-only">needs review</span>
+                </>
+              )}
             </button>
           ))}
         </nav>
@@ -295,433 +332,51 @@ function App() {
         openSettings={() => setTab("settings")}
       />
       <main className="desk-scroll">
-        {tab === "assistant" && (
-          <>
-            <div className="section-label">
-              <span>CONVERSATION DESK</span>
-              <span className="live">
-                <i />
-                {context ? "Chat connected" : "Waiting for a chat"}
-              </span>
-            </div>
-            <section
-              className="inbox-monitor"
-              aria-label="All-chat reply queue"
-            >
-              <div className="inbox-monitor-head">
-                <span className="inbox-monitor-icon">
-                  <Users size={17} />
-                </span>
-                <div>
-                  <strong>Reply across all chats</strong>
-                  <small>
-                    {desk.settings.allChats
-                      ? (desk.inbox?.status ?? "Connecting inbox monitor…")
-                      : "Reply only in the conversation you open"}
-                  </small>
-                </div>
-                <Toggle
-                  label="Reply to new messages across all chats"
-                  checked={desk.settings.allChats}
-                  onChange={(allChats) => changeSettings({ allChats })}
-                />
-              </div>
-              {desk.settings.allChats && (
-                <>
-                  <p className="inbox-monitor-hint">
-                    Chats open automatically to reply. Switching pauses while
-                    you type.
-                  </p>
-                  {desk.inbox?.items
-                    .filter((i) =>
-                      ["waiting", "replying", "review"].includes(i.status),
-                    )
-                    .sort((a, b) => a.dueAt - b.dueAt)
-                    .slice(0, 5)
-                    .map((item) => (
-                      <div className="inbox-queue-item" key={item.key}>
-                        <span>
-                          <strong>{item.name}</strong>
-                          <small>
-                            {item.status === "waiting"
-                              ? replyCountdown(
-                                  {
-                                    chatId: item.chatId ?? "",
-                                    incomingId: item.incomingId ?? null,
-                                    dueAt: item.dueAt,
-                                    phase: "quiet",
-                                  },
-                                  clock,
-                                )
-                              : item.status === "replying"
-                                ? "Preparing reply…"
-                                : "Human review needed"}
-                          </small>
-                        </span>
-                        {item.status === "review" && item.chatId && (
-                          <button
-                            className="text-button"
-                            title={item.detail}
-                            onClick={() =>
-                              void act("OPEN_INBOX_ITEM", {
-                                key: item.key,
-                              }).catch(() => {})
-                            }
-                          >
-                            Review <ArrowRight size={13} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  {desk.inbox &&
-                    desk.inbox.items.filter((i) =>
-                      ["waiting", "replying", "review"].includes(i.status),
-                    ).length > 5 && (
-                      <small className="inbox-monitor-hint">
-                        {desk.inbox.items.filter((i) =>
-                          ["waiting", "replying", "review"].includes(i.status),
-                        ).length - 5}{" "}
-                        more in the queue
-                      </small>
-                    )}
-                </>
-              )}
-            </section>
-            {context && client ? (
-              <>
-                <div className="client-heading">
-                  <div className="avatar">
-                    <Initials name={context.name} size={22} />
-                  </div>
-                  <div className="client-title">
-                    <h1 title={context.name}>{context.name}</h1>
-                    <div className="stage-select" data-stage={client.stage}>
-                      <select
-                        aria-label="Client stage"
-                        value={client.stage}
-                        onChange={(e) =>
-                          void act("UPDATE_CLIENT", {
-                            chatId: context.chatId,
-                            patch: { stage: e.target.value },
-                          }).catch(() => {})
-                        }
-                      >
-                        {(
-                          [
-                            "New lead",
-                            "In conversation",
-                            "Follow-up",
-                            "Client",
-                          ] as Stage[]
-                        ).map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={11} />
-                    </div>
-                  </div>
-                  <button
-                    className="icon-button client-schedule"
-                    aria-label="Schedule a follow-up for this client"
-                    onClick={() => setTab("followups")}
-                  >
-                    <CalendarClock size={20} />
-                  </button>
-                </div>
-                <WindowCard
-                  incoming={
-                    context.lastIncomingId && context.lastIncomingAt === null
-                      ? null
-                      : Math.max(
-                          client.lastIncomingAt ?? 0,
-                          context.lastIncomingAt ?? 0,
-                        ) || null
-                  }
-                  now={clock}
-                />
-                <div className="handoff-row">
-                  <div>
-                    <span
-                      className={`tiny-icon ${client.human ? "amber" : ""}`}
-                    >
-                      <Headphones size={17} />
-                    </span>
-                    <div>
-                      <strong>
-                        {client.human
-                          ? "Human is handling this"
-                          : "Human support"}
-                      </strong>
-                      <small>
-                        {client.human
-                          ? "Automatic replies are paused"
-                          : "Take over whenever you need"}
-                      </small>
-                    </div>
-                  </div>
-                  <button
-                    className={`subtle-button ${client.human ? "amber-text" : ""}`}
-                    onClick={() =>
-                      void act(
-                        "UPDATE_CLIENT",
-                        {
-                          chatId: context.chatId,
-                          patch: { human: !client.human },
-                        },
-                        client.human
-                          ? "Assistant resumed."
-                          : "Human handoff enabled. Automatic replies paused.",
-                      ).catch(() => {})
-                    }
-                  >
-                    {client.human ? "Resume AI" : "Take over"}
-                    <ArrowRight size={13} />
-                  </button>
-                </div>
-                <div className="section-title">
-                  <h2>
-                    <Sparkles size={16} />
-                    Reply assistant
-                  </h2>
-                  <span className="model-tag">{desk.settings.model}</span>
-                </div>
-                {context.messages.slice(-35).some((m) => m.images?.length) && (
-                  <p className="field-hint" role="status">
-                    Pictures detected · the AI will read their contents with
-                    this conversation. Open or download any blurred image in
-                    WhatsApp first.
-                  </p>
-                )}
-                <div className={`reply-card ${busy ? "generating" : ""}`}>
-                  <div className="reply-top">
-                    <span>
-                      <i />
-                      {busy
-                        ? "Drafting your reply"
-                        : draft
-                          ? "Suggested reply"
-                          : "Ready when you are"}
-                    </span>
-                    <Sparkles size={16} />
-                  </div>
-                  {busy ? (
-                    <div className="draft-loading">
-                      <span />
-                      <span />
-                      <span />
-                      <p>Finding the right answer in your knowledge…</p>
-                    </div>
-                  ) : draft ? (
-                    <>
-                      <p className="draft-text">{draft.reply}</p>
-                      {draft.needsHuman && (
-                        <div className="review-note">
-                          <Headphones size={14} />
-                          <span>
-                            {draft.reason ||
-                              "A human should review this reply."}
-                          </span>
-                        </div>
-                      )}
-                      <div className="draft-sources">
-                        <BookOpen size={13} />
-                        <span>
-                          {draft.sources.length
-                            ? draft.sources
-                                .map(
-                                  (id) =>
-                                    desk.knowledge.find((k) => k.id === id)
-                                      ?.name,
-                                )
-                                .filter(Boolean)
-                                .join(", ")
-                            : "General conversation · no business facts cited"}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="reply-empty">
-                      <div className="sparkle-pair">
-                        <Sparkles size={24} />
-                      </div>
-                      <h3>A thoughtful reply, one click away.</h3>
-                      <p>
-                        Uses this conversation and your business knowledge.
-                        Lands right in the WhatsApp chat box.
-                      </p>
-                    </div>
-                  )}
-                  <button
-                    className="primary-button draft-button"
-                    onClick={() => void generate()}
-                    disabled={busy || context.isGroup || !context.composerEmpty}
-                  >
-                    {busy ? (
-                      <LoaderCircle size={17} className="spin" />
-                    ) : (
-                      <Sparkles size={17} />
-                    )}
-                    <span>
-                      {busy
-                        ? "Drafting reply…"
-                        : !context.composerEmpty
-                          ? "Review your reply in WhatsApp"
-                          : desk.settings.autoSend && !client.human
-                            ? "Draft & send reply"
-                            : draft
-                              ? "Draft another reply"
-                              : "Draft a reply"}
-                    </span>
-                    {!busy && <ArrowUpRight size={17} />}
-                  </button>
-                  <div className="reply-footnote">
-                    <ShieldCheck size={12} />
-                    {!context.composerEmpty
-                      ? "Send or clear the chat box before drafting again."
-                      : draft?.placement === "Sent automatically"
-                        ? draft.placement
-                        : desk.settings.autoSend && !client.human
-                          ? "Auto-send is on · supported replies may send"
-                          : "You review. You decide when to send."}
-                  </div>
-                </div>
-                {!desk.hasKey && (
-                  <button
-                    className="setup-link"
-                    onClick={() => setTab("settings")}
-                  >
-                    <KeyRound size={16} />
-                    <span>Connect OpenAI to start drafting</span>
-                    <ChevronRight size={16} />
-                  </button>
-                )}
-                <div className="automation-group">
-                  <div className="automation-card">
-                    <div>
-                      <div className="automation-title">
-                        <Send size={15} />
-                        <strong>
-                          {STORE_RELEASE ? "Manual send" : "Auto-send"}
-                        </strong>
-                        <span
-                          className={
-                            desk.settings.autoSend
-                              ? "badge active-badge"
-                              : "badge"
-                          }
-                        >
-                          {STORE_RELEASE
-                            ? "REQUIRED"
-                            : desk.settings.autoSend
-                              ? "ON"
-                              : "OFF"}
-                        </span>
-                      </div>
-                      <p>
-                        {STORE_RELEASE
-                          ? "Review every draft in WhatsApp and click Send yourself."
-                          : desk.settings.autoSend
-                          ? "Replies are paced by length. Longer answers may arrive in two messages."
-                          : "Drafts stay in the chat box for a human to send."}
-                      </p>
-                    </div>
-                    <Toggle
-                      label={
-                        STORE_RELEASE
-                          ? "Manual sending is required"
-                          : "Auto-send replies"
-                      }
-                      checked={desk.settings.autoSend}
-                      onChange={(v) => changeSettings({ autoSend: v })}
-                      disabled={STORE_RELEASE}
-                    />
-                  </div>
-                  <div className="auto-draft-row">
-                    <div>
-                      <strong>Draft as messages arrive</strong>
-                      <small>
-                        Clear questions: 8–12 sec · Other messages: 30–45 sec
-                      </small>
-                    </div>
-                    <Toggle
-                      label="Automatically draft new messages"
-                      checked={desk.settings.autoDraft}
-                      onChange={(v) => changeSettings({ autoDraft: v })}
-                    />
-                  </div>
-                </div>
-                {desk.replyTiming ? (
-                  <p
-                    className="activity-text reply-countdown"
-                    role="timer"
-                    aria-live="off"
-                  >
-                    <Clock3 size={14} aria-hidden="true" />
-                    <strong>{replyCountdown(desk.replyTiming, clock)}</strong>
-                  </p>
-                ) : desk.activity && !busy ? (
-                  <p className="activity-text" role="status">
-                    {desk.activity}
-                  </p>
-                ) : null}
-                <ClientNotes
-                  client={client}
-                  save={(notes) =>
-                    act(
-                      "UPDATE_CLIENT",
-                      { chatId: client.chatId, patch: { notes } },
-                      "Client note saved",
-                    )
-                  }
-                />
-              </>
-            ) : (
-              <>
-                <div className="empty-state">
-                  <span className="large-icon">
-                    <MessageCircle size={32} />
-                  </span>
-                  <h1>Your next great conversation starts here.</h1>
-                  <p>
-                    Open an individual client chat in WhatsApp. Their reply
-                    window, AI assistant and follow-ups will appear here.
-                  </p>
-                </div>
-                <SetupChecklist desk={desk} select={setTab} />
-              </>
-            )}
-            <button
-              className="knowledge-shortcut"
-              onClick={() => setTab("knowledge")}
-            >
-              <span className="tiny-icon">
-                <BookOpen size={17} />
-              </span>
-              <div>
-                <strong>Your business knowledge</strong>
-                <small>
-                  {desk.knowledge.length
-                    ? `${desk.knowledge.length} document${desk.knowledge.length === 1 ? "" : "s"} ready for replies`
-                    : "Add your services, prices and FAQs"}
-                </small>
-              </div>
-              <ChevronRight size={17} />
-            </button>
-          </>
-        )}
+        <div className="tab-panel assistant-panel" hidden={tab !== "assistant"}>
+          {chatOpen ? (
+            <ClientBar
+              context={chatOpen.context}
+              client={chatOpen.client}
+              now={clock}
+              act={act}
+              openFollowUps={() => setTab("followups")}
+            />
+          ) : (
+            <NoChatHint />
+          )}
+          <AutomationBar
+            desk={desk}
+            now={clock}
+            act={act}
+            changeSettings={changeSettings}
+          />
+          <Assistant
+            desk={desk}
+            refresh={refresh}
+            openSettings={() => setTab("settings")}
+          />
+          <CallRecorder
+            desk={desk}
+            visible={tab === "assistant"}
+            refresh={refresh}
+            onStatusChange={setCall}
+            openSignal={callOpenSignal}
+          />
+          {chatOpen ? (
+            <ClientNotes
+              client={chatOpen.client}
+              save={(chatId, notes) =>
+                act("UPDATE_CLIENT", { chatId, patch: { notes } })
+              }
+            />
+          ) : (
+            <SetupChecklist desk={desk} select={setTab} />
+          )}
+        </div>
         {tab === "followups" && <FollowUps desk={desk} act={act} now={clock} />}
         {tab === "knowledge" && <KnowledgeView desk={desk} act={act} />}
         {tab === "settings" && <SettingsView desk={desk} act={act} />}
       </main>
-      <footer className="desk-footer">
-        <span>
-          <Fingerprint size={13} />
-          Saved on this device
-        </span>
-        <span>
-          Made for better conversations <i>✦</i>
-        </span>
-      </footer>
       {toast && (
         <div className="toast" role="status">
           <span>{toast}</span>
@@ -746,7 +401,14 @@ function App() {
     </div>
   );
 }
-function WindowCard({
+type Act = (
+  type: string,
+  payload?: Record<string, unknown>,
+  success?: string,
+) => Promise<any>;
+const WINDOW_NOTE =
+  "Tracks 24 hours from the latest observed customer message. Your outgoing replies do not reset it.";
+function WindowChip({
   incoming,
   now,
 }: {
@@ -754,87 +416,421 @@ function WindowCard({
   now: number;
 }) {
   const w = windowState(incoming, now);
-  const urgent = w.known && w.remaining < 3 * 3600000;
+  const state = !w.known
+    ? "unknown"
+    : !w.open
+      ? "closed"
+      : w.remaining < 3 * 3600000
+        ? "urgent"
+        : "open";
+  const label =
+    state === "unknown"
+      ? "Reply window: not yet known"
+      : state === "closed"
+        ? "Window closed"
+        : `${w.display} left`;
+  const last = incoming
+    ? `Last customer message · ${dateText(incoming)}.`
+    : "Waiting for a readable customer timestamp.";
   return (
-    <section
-      className={`window-card ${urgent ? "urgent" : ""}`}
-      aria-label="24-hour customer response window"
+    <span
+      className="window-chip"
+      data-state={state}
+      role="img"
+      aria-label={`24-hour reply window: ${label}`}
+      title={`${last} ${WINDOW_NOTE}`}
     >
-      <div className="window-top">
-        <span>
-          <Clock3 size={14} />
-          24-hour response window
-        </span>
-        <span className="window-state">
-          <i />
-          {!w.known ? "Not yet known" : w.open ? "Open" : "Closed"}
-        </span>
+      {state !== "unknown" && state !== "closed" && <Clock3 size={13} />}
+      {label}
+    </span>
+  );
+}
+function ClientBar({
+  context,
+  client,
+  now,
+  act,
+  openFollowUps,
+}: {
+  context: NonNullable<DeskState["context"]>;
+  client: Client;
+  now: number;
+  act: Act;
+  openFollowUps: () => void;
+}) {
+  const incoming =
+    context.lastIncomingId && context.lastIncomingAt === null
+      ? null
+      : Math.max(client.lastIncomingAt ?? 0, context.lastIncomingAt ?? 0) ||
+        null;
+  return (
+    <section className="client-bar" aria-label="Client">
+      <div className="client-bar-row">
+        <div className="avatar">
+          <Initials name={context.name} size={18} />
+        </div>
+        <div className="client-title">
+          <h1 title={context.name}>{context.name}</h1>
+        </div>
+        <button
+          type="button"
+          className={`takeover-button ${client.human ? "on" : ""}`}
+          aria-pressed={client.human}
+          aria-label="Human takeover"
+          title={
+            client.human
+              ? "Automatic replies are paused. Resume the assistant."
+              : "Take over whenever you need. Automatic replies pause."
+          }
+          onClick={() =>
+            void act(
+              "UPDATE_CLIENT",
+              { chatId: context.chatId, patch: { human: !client.human } },
+              client.human
+                ? "Assistant resumed."
+                : "Human handoff enabled. Automatic replies paused.",
+            ).catch(() => {})
+          }
+        >
+          <Headphones size={15} />
+          <span>{client.human ? "Resume AI" : "Take over"}</span>
+        </button>
+        <button
+          className="icon-button client-schedule"
+          aria-label="Schedule a follow-up for this client"
+          onClick={openFollowUps}
+        >
+          <CalendarClock size={18} />
+        </button>
       </div>
-      <div className="countdown">
-        <span>{w.display}</span>
-        <small>
-          {!w.known
-            ? "Open the latest messages"
-            : w.open
-              ? "time remaining"
-              : "window has ended"}
-        </small>
+      <div className="client-bar-row client-bar-meta">
+        <div className="stage-select" data-stage={client.stage}>
+          <select
+            aria-label="Client stage"
+            value={client.stage}
+            onChange={(e) =>
+              void act("UPDATE_CLIENT", {
+                chatId: context.chatId,
+                patch: { stage: e.target.value },
+              }).catch(() => {})
+            }
+          >
+            {(
+              [
+                "New lead",
+                "In conversation",
+                "Follow-up",
+                "Client",
+              ] as Stage[]
+            ).map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <ChevronDown size={11} />
+        </div>
+        <WindowChip incoming={incoming} now={now} />
       </div>
-      <div className="window-track">
-        <span style={{ width: `${w.progress * 100}%` }} />
-      </div>
-      <div className="window-detail">
-        <span>
-          {incoming
-            ? `Last customer message · ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" }).format(incoming)}`
-            : "Waiting for a readable customer timestamp"}
-        </span>
-        <CircleHelp size={13}>
-          <title>
-            Tracks 24 hours from the latest observed customer message. Your
-            outgoing replies do not reset it.
-          </title>
-        </CircleHelp>
-      </div>
+      {client.human && (
+        <p className="human-strip">
+          You're handling this chat. Automatic replies are paused.
+        </p>
+      )}
     </section>
   );
 }
-type Act = (
-  type: string,
-  payload?: Record<string, unknown>,
-  success?: string,
-) => Promise<any>;
+function NoChatHint() {
+  return (
+    <div className="no-chat-hint">
+      <MessageCircle size={16} />
+      <p>
+        Open an individual client chat in WhatsApp to see their reply window and
+        follow-ups.
+      </p>
+    </div>
+  );
+}
+function AutomationChip({
+  label,
+  name,
+  icon,
+  checked,
+  onChange,
+  title,
+  disabled = false,
+}: {
+  label: string;
+  name: string;
+  icon: React.ReactNode;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  title: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={name}
+      title={title}
+      disabled={disabled}
+      className={`automation-chip ${checked ? "on" : ""}`}
+      onClick={() => onChange(!checked)}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+function AutomationBar({
+  desk,
+  now,
+  act,
+  changeSettings,
+}: {
+  desk: DeskState;
+  now: number;
+  act: Act;
+  changeSettings: (patch: Partial<Settings>) => void;
+}) {
+  const [queueOpen, setQueueOpen] = useState(false);
+  const { settings } = desk;
+  const queue = (desk.inbox?.items ?? [])
+    .filter((i) => ["waiting", "replying", "review"].includes(i.status))
+    .sort((a, b) => a.dueAt - b.dueAt);
+  const reviewCount = queue.filter((i) => i.status === "review").length;
+  const shown = queueOpen
+    ? queue.slice(0, 5)
+    : queue.filter((i) => i.status === "review");
+  return (
+    <section className="automation-bar" role="group" aria-label="Automation">
+      <div className="automation-chips">
+        <AutomationChip
+          label="Auto-draft"
+          name="Auto-draft new messages"
+          icon={<Sparkles size={13} />}
+          checked={settings.autoDraft}
+          onChange={(autoDraft) => changeSettings({ autoDraft })}
+          title="Draft as messages arrive. Clear questions: 8–12 sec · Other messages: 30–45 sec."
+        />
+        <AutomationChip
+          label={STORE_RELEASE ? "Manual send" : "Auto-send"}
+          name={
+            STORE_RELEASE ? "Manual sending is required" : "Auto-send replies"
+          }
+          icon={<Send size={13} />}
+          checked={STORE_RELEASE ? false : settings.autoSend}
+          onChange={(autoSend) => changeSettings({ autoSend })}
+          disabled={STORE_RELEASE}
+          title={
+            STORE_RELEASE
+              ? "Review every draft in WhatsApp and click Send yourself."
+              : settings.autoSend
+                ? "Replies are paced by length. Longer answers may arrive in two messages."
+                : "Drafts stay in the chat box for a human to send."
+          }
+        />
+        <AutomationChip
+          label="All chats"
+          name="Reply across all chats"
+          icon={<Users size={13} />}
+          checked={settings.allChats}
+          onChange={(allChats) => changeSettings({ allChats })}
+          title="Reply to new messages across all chats. Chats open automatically to reply; switching pauses while you type."
+        />
+      </div>
+      {desk.replyTiming ? (
+        <p className="activity-text reply-countdown" role="timer" aria-live="off">
+          <Clock3 size={14} aria-hidden="true" />
+          <strong>{replyCountdown(desk.replyTiming, now)}</strong>
+        </p>
+      ) : desk.activity ? (
+        <p className="activity-text" role="status">
+          {desk.activity}
+        </p>
+      ) : null}
+      {settings.allChats && (
+        <div className="queue-row">
+          <button
+            type="button"
+            className="queue-toggle"
+            aria-expanded={queueOpen}
+            onClick={() => setQueueOpen(!queueOpen)}
+          >
+            <Users size={14} />
+            <span className="queue-status">
+              {desk.inbox?.status ?? "Connecting inbox monitor…"}
+            </span>
+            {reviewCount > 0 && (
+              <span className="badge amber-badge">
+                {reviewCount} {reviewCount === 1 ? "needs" : "need"} review
+              </span>
+            )}
+            <ChevronDown size={14} className={queueOpen ? "rotated" : ""} />
+          </button>
+          {shown.map((item) => (
+            <div className="inbox-queue-item" key={item.key}>
+              <span>
+                <strong>{item.name}</strong>
+                <small>
+                  {item.status === "waiting"
+                    ? replyCountdown(
+                        {
+                          chatId: item.chatId ?? "",
+                          incomingId: item.incomingId ?? null,
+                          dueAt: item.dueAt,
+                          phase: "quiet",
+                        },
+                        now,
+                      )
+                    : item.status === "replying"
+                      ? "Preparing reply…"
+                      : "Human review needed"}
+                </small>
+              </span>
+              {item.status === "review" && item.chatId && (
+                <button
+                  className="text-button"
+                  title={item.detail}
+                  onClick={() =>
+                    void act("OPEN_INBOX_ITEM", { key: item.key }).catch(
+                      () => {},
+                    )
+                  }
+                >
+                  Review <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+          ))}
+          {queueOpen && queue.length > 5 && (
+            <small className="inbox-monitor-hint">
+              {queue.length - 5} more in the queue
+            </small>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+type NoteStatus = "idle" | "saving" | "saved" | "error";
 function ClientNotes({
   client,
   save,
 }: {
   client: Client;
-  save: (notes: string) => Promise<any>;
+  save: (chatId: string, notes: string) => Promise<unknown>;
 }) {
   const [notes, setNotes] = useState(client.notes);
-  useEffect(() => setNotes(client.notes), [client.chatId, client.notes]);
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<NoteStatus>("idle");
+  const state = useRef({
+    chatId: client.chatId,
+    saved: client.notes,
+    text: client.notes,
+    dirty: false,
+  });
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const mounted = useRef(true);
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  function persist(chatId: string, text: string) {
+    const current = () => state.current.chatId === chatId;
+    if (mounted.current && current()) setStatus("saving");
+    return Promise.resolve()
+      .then(() => saveRef.current(chatId, text))
+      .then(() => {
+        if (!current()) return;
+        if (state.current.text === text) {
+          state.current.saved = text;
+          state.current.dirty = false;
+        }
+        if (mounted.current)
+          setStatus(state.current.dirty ? "saving" : "saved");
+      })
+      .catch(() => {
+        if (mounted.current && current()) setStatus("error");
+      });
+  }
+  function flush() {
+    clearTimeout(timer.current);
+    const s = state.current;
+    if (s.dirty) void persist(s.chatId, s.text);
+  }
+  useEffect(() => {
+    const s = state.current;
+    if (s.chatId !== client.chatId) {
+      clearTimeout(timer.current);
+      if (s.dirty) void persist(s.chatId, s.text);
+      state.current = {
+        chatId: client.chatId,
+        saved: client.notes,
+        text: client.notes,
+        dirty: false,
+      };
+      setNotes(client.notes);
+      setStatus("idle");
+    } else if (!s.dirty && client.notes !== s.text) {
+      s.saved = client.notes;
+      s.text = client.notes;
+      setNotes(client.notes);
+    }
+  }, [client.chatId, client.notes]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer.current);
+      const s = state.current;
+      if (s.dirty) void persist(s.chatId, s.text);
+    };
+  }, []);
+  function change(value: string) {
+    const s = state.current;
+    s.text = value;
+    s.dirty = value !== s.saved;
+    setNotes(value);
+    clearTimeout(timer.current);
+    if (s.dirty) timer.current = setTimeout(flush, 800);
+    else setStatus("idle");
+  }
+  const preview = notes.trim().split("\n")[0];
   return (
-    <div className="client-notes">
-      <div className="section-title">
-        <h2>Client note</h2>
-        {notes !== client.notes && (
-          <button
-            className="text-button"
-            onClick={() => void save(notes).catch(() => {})}
-          >
-            Save note
-          </button>
-        )}
-      </div>
-      <textarea
-        aria-label="Client note"
-        placeholder="A detail worth remembering…"
-        rows={2}
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        maxLength={5000}
-      />
-    </div>
+    <section className="client-notes">
+      <button
+        type="button"
+        className="note-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <StickyNote size={15} />
+        <strong>Client note</strong>
+        <span className={`note-preview ${preview ? "" : "empty"}`}>
+          {preview || "Add a detail worth remembering"}
+        </span>
+        <span className={`note-status ${status}`} aria-live="polite">
+          {status === "saving"
+            ? "Saving…"
+            : status === "saved"
+              ? "Saved"
+              : status === "error"
+                ? "Not saved"
+                : ""}
+        </span>
+        <ChevronDown size={14} className={open ? "rotated" : ""} />
+      </button>
+      {open && (
+        <textarea
+          aria-label="Client note"
+          placeholder="A detail worth remembering…"
+          rows={3}
+          value={notes}
+          onChange={(e) => change(e.target.value)}
+          onBlur={flush}
+          maxLength={5000}
+        />
+      )}
+    </section>
   );
 }
 function SetupChecklist({
@@ -844,6 +840,7 @@ function SetupChecklist({
   desk: DeskState;
   select: (tab: Tab) => void;
 }) {
+  if (desk.knowledge.length && desk.hasKey) return null;
   return (
     <div className="setup-checklist">
       <h2>Make it yours</h2>
@@ -863,6 +860,25 @@ function SetupChecklist({
         <span>Connect your OpenAI key</span>
         {desk.hasKey ? <Check size={16} /> : <ArrowRight size={16} />}
       </button>
+    </div>
+  );
+}
+function PageTitle({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="page-title">
+      <div>
+        <h1>{title}</h1>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {action}
     </div>
   );
 }
@@ -906,22 +922,23 @@ function FollowUps({
   }
   return (
     <>
-      <div className="page-heading">
-        <span className="eyebrow">A LITTLE FOLLOW-THROUGH</span>
-        <h1>Keep the conversation going.</h1>
-        <p>A timely check-in can turn an enquiry into a client.</p>
-      </div>
-      <button
-        className="primary-button full-button"
-        disabled={!desk.context || desk.context.isGroup}
-        onClick={() => setShow(!show)}
-      >
-        <Plus size={18} />
-        {show ? "Close new follow-up" : "Schedule a follow-up"}
-      </button>
-      {!desk.context && (
+      <PageTitle
+        title="Follow-ups"
+        subtitle="A timely check-in can turn an enquiry into a client."
+        action={
+          <button
+            className="primary-button compact-button"
+            disabled={!desk.context || desk.context.isGroup}
+            onClick={() => setShow(!show)}
+          >
+            <Plus size={15} />
+            {show ? "Close" : "Schedule"}
+          </button>
+        }
+      />
+      {(!desk.context || desk.context.isGroup) && (
         <p className="field-hint">
-          Open the client’s WhatsApp conversation first.
+          Open an individual client chat to schedule.
         </p>
       )}
       {show && (
@@ -1062,13 +1079,14 @@ function FollowUps({
           ))}
         </div>
       )}
-      <div className="info-note">
-        <Bell size={16} />
+      <div
+        className="info-note one-line"
+        title={`Keep Chrome running for on-time reminders. If your computer sleeps or the browser closes, overdue items appear when it wakes or reopens. Your timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}.`}
+      >
+        <Bell size={14} />
         <p>
-          Keep Chrome running for on-time reminders. If your computer sleeps or the
-          browser closes, overdue items appear when it wakes or reopens. Your
-          timezone:{" "}
-          <strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>.
+          Reminders need Chrome running ·{" "}
+          {Intl.DateTimeFormat().resolvedOptions().timeZone}
         </p>
       </div>
     </>
@@ -1196,6 +1214,7 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
+  const dragDepth = useRef(0);
   async function upload(files: FileList | File[] | null) {
     if (!files?.length) return;
     setUploading(true);
@@ -1228,20 +1247,76 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
   const docs = desk.knowledge.filter((k) =>
     `${k.name} ${k.text}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const hasDocs = desk.knowledge.length > 0;
+  const knowledgeSize = desk.knowledge.reduce((n, k) => n + k.text.length, 0);
+  const dropZone = (
+    <button
+      className={`upload-zone ${drag ? "drag" : ""}`}
+      disabled={uploading}
+      onClick={() => fileInput.current?.click()}
+    >
+      <span className="upload-icon">
+        {uploading ? (
+          <LoaderCircle className="spin" size={22} />
+        ) : (
+          <UploadCloud size={22} />
+        )}
+      </span>
+      <strong>
+        {uploading
+          ? "Reading your documents…"
+          : "Drop your business documents here"}
+      </strong>
+      <span>
+        or <b>choose files</b> from your device
+      </span>
+      <small>PDF, DOCX, TXT, MD, CSV, JSON · up to 10 MB each</small>
+    </button>
+  );
   return (
-    <>
-      <div className="page-heading">
-        <span className="eyebrow">THE KNOW-HOW BEHIND EVERY REPLY</span>
-        <h1>
-          Your business,
-          <br />
-          in its own words.
-        </h1>
-        <p>
-          Give your assistant the information you trust. Services, pricing,
-          processes and those often-asked questions.
-        </p>
-      </div>
+    <div
+      className={`knowledge-view ${drag ? "drag" : ""}`}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragDepth.current++;
+        setDrag(true);
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={() => {
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDrag(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        dragDepth.current = 0;
+        setDrag(false);
+        void upload(e.dataTransfer.files);
+      }}
+    >
+      <PageTitle
+        title="Knowledge"
+        subtitle="The know-how behind every reply."
+        action={
+          <div className="page-actions">
+            <button
+              className="secondary-button compact-button"
+              disabled={uploading}
+              onClick={() => fileInput.current?.click()}
+            >
+              <UploadCloud size={15} />
+              Upload
+            </button>
+            <button
+              className="secondary-button compact-button"
+              aria-expanded={note}
+              onClick={() => setNote(!note)}
+            >
+              <Plus size={15} />
+              Note
+            </button>
+          </div>
+        }
+      />
       <input
         ref={fileInput}
         type="file"
@@ -1250,50 +1325,12 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
         accept=".pdf,.docx,.txt,.md,.csv,.json"
         onChange={(e) => void upload(e.target.files)}
       />
-      <button
-        className={`upload-zone ${drag ? "drag" : ""}`}
-        disabled={uploading}
-        onClick={() => fileInput.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          void upload(e.dataTransfer.files);
-        }}
-      >
-        <span className="upload-icon">
-          {uploading ? (
-            <LoaderCircle className="spin" size={25} />
-          ) : (
-            <UploadCloud size={25} />
-          )}
-        </span>
-        <strong>
-          {uploading
-            ? "Reading your documents…"
-            : "Drop your business documents here"}
-        </strong>
-        <span>
-          or <b>choose files</b> from your device
-        </span>
-        <small>PDF, DOCX, TXT, MD, CSV, JSON · up to 10 MB each</small>
-      </button>
+      {!hasDocs && dropZone}
       {error && (
         <p role="alert" className="inline-error">
           {error}
         </p>
       )}
-      <button
-        className="secondary-button full-button"
-        onClick={() => setNote(!note)}
-      >
-        <Plus size={16} />
-        {note ? "Close note" : "Write a business note"}
-      </button>
       {note && (
         <form className="form-card" onSubmit={saveNote}>
           <label>
@@ -1323,17 +1360,18 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
           </button>
         </form>
       )}
-      <div className="library-heading">
-        <h2>
-          Knowledge library <span>{desk.knowledge.length}</span>
-        </h2>
-        <span>
-          {Math.round(
-            desk.knowledge.reduce((n, k) => n + k.text.length, 0) / 1000,
-          )}
-          k characters
-        </span>
-      </div>
+      {hasDocs && (
+        <div className="library-heading">
+          <h2>
+            Knowledge library <span>{desk.knowledge.length}</span>
+          </h2>
+          <span>
+            {knowledgeSize < 1000
+              ? `${knowledgeSize.toLocaleString()} characters`
+              : `${Math.round(knowledgeSize / 1000)}k characters`}
+          </span>
+        </div>
+      )}
       {desk.knowledge.length > 2 && (
         <div className="search-field">
           <Search size={15} />
@@ -1392,22 +1430,43 @@ function KnowledgeView({ desk, act }: { desk: DeskState; act: Act }) {
           </article>
         ))}
       </div>
-      {!docs.length && (
-        <p className="empty-library">
-          {search
-            ? "No documents match your search."
-            : "Your library is ready for its first document."}
-        </p>
+      {hasDocs && !docs.length && (
+        <p className="empty-library">No documents match your search.</p>
       )}
-      <div className="info-note">
-        <LockKeyhole size={16} />
-        <p>
-          Documents stay on this device. Relevant excerpts and the current
-          conversation are sent directly to OpenAI when drafting. Scanned PDFs
-          need readable text or OCR.
-        </p>
+      <div
+        className="info-note one-line"
+        title="Documents stay on this device. Relevant excerpts and the current conversation are sent directly to OpenAI when drafting. Scanned PDFs need readable text or OCR."
+      >
+        <LockKeyhole size={14} />
+        <p>Documents stay on this device · excerpts go to OpenAI when drafting</p>
       </div>
-    </>
+    </div>
+  );
+}
+const CUSTOM_MODEL = "__custom__";
+const EDITABLE_SETTINGS = [
+  "model",
+  "businessName",
+  "businessInstructions",
+  "dateOrder",
+] as const;
+type EditableSettings = Pick<Settings, (typeof EDITABLE_SETTINGS)[number]>;
+function SettingsSummary({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <summary>
+      {icon}
+      <strong>{title}</strong>
+      {value && <small>{value}</small>}
+      <ChevronDown size={15} />
+    </summary>
   );
 }
 function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
@@ -1499,20 +1558,29 @@ function LicenseCard({ desk, act }: { desk: DeskState; act: Act }) {
   );
 }
 function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
-  const [form, setForm] = useState({ ...desk.settings });
+  const [edits, setEdits] = useState<Partial<EditableSettings>>({});
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
+  const form: Settings = { ...desk.settings, ...edits };
+  const changed: Partial<EditableSettings> = {};
+  for (const field of EDITABLE_SETTINGS)
+    if (field in edits && edits[field] !== desk.settings[field])
+      Object.assign(changed, { [field]: edits[field] });
+  const dirty = Object.keys(changed).length > 0;
+  const edit = (patch: Partial<EditableSettings>) =>
+    setEdits((current) => ({ ...current, ...patch }));
+  const setAutomation = (patch: Partial<Settings>) =>
+    void act("SAVE_SETTINGS", { settings: patch }).catch(() => {});
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!dirty) return;
     setSaving(true);
     try {
-      await act(
-        "SAVE_SETTINGS",
-        { settings: form },
-        "Workspace settings saved.",
-      );
+      await act("SAVE_SETTINGS", { settings: changed }, "Workspace settings saved.");
+      setEdits({});
     } catch {
     } finally {
       setSaving(false);
@@ -1534,216 +1602,295 @@ function SettingsView({ desk, act }: { desk: DeskState; act: Act }) {
   }
   const models = [
     ...new Set([
-      form.model,
       ...desk.models,
       ...(!desk.models.length ? ["gpt-5-mini", "gpt-4.1-mini", "gpt-4.1"] : []),
     ]),
   ];
+  const showCustomModel = customModel || !models.includes(form.model);
   return (
     <>
-      <div className="page-heading">
-        <span className="eyebrow">SET UP YOUR WAY OF WORKING</span>
-        <h1>
-          A little setup.
-          <br />A lot less typing.
-        </h1>
-        <p>Your AI connection, your business voice, your control.</p>
-      </div>
+      <PageTitle title="Settings" />
       <LicenseCard desk={desk} act={act} />
-      <section className="form-card key-card">
-        <div className="card-heading">
-          <span className="tiny-icon">
-            <KeyRound size={19} />
-          </span>
-          <div>
-            <h2>OpenAI connection</h2>
-            <p>
-              {desk.hasKey
-                ? "A key is saved on this device"
-                : "Bring your own OpenAI API key"}
-            </p>
-          </div>
-          <span className={`key-status ${desk.hasKey ? "saved" : ""}`}>
-            <i />
-            {desk.hasKey ? "Key saved" : "Not connected"}
-          </span>
-        </div>
-        <label>
-          API key
-          <div className="key-input">
-            <input
-              type={showKey ? "text" : "password"}
-              autoComplete="off"
-              spellCheck={false}
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder={
-                desk.hasKey
-                  ? "Paste a new key to replace the saved one"
-                  : "sk-…"
-              }
-              aria-label="OpenAI API key"
-            />
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => setShowKey(!showKey)}
-            >
-              {showKey ? "Hide" : "Show"}
-            </button>
-          </div>
-        </label>
-        <button
-          type="button"
-          className="primary-button full-button"
-          onClick={() => void saveKey()}
-          disabled={!key.trim() || saving || loading}
-        >
-          {saving || loading ? (
-            <LoaderCircle size={16} className="spin" />
-          ) : (
-            <LockKeyhole size={16} />
-          )}
-          Save key & connect
-        </button>
-        <p className="key-privacy">
-          <ShieldCheck size={13} />
-          Stored in this extension’s local browser storage. Never synced or
-          exposed to the WhatsApp page. Anyone with access to your browser
-          profile may access it.
-        </p>
-        {desk.hasKey && (
+      <details className="form-card settings-section key-card" open={!desk.hasKey}>
+        <SettingsSummary
+          title="OpenAI connection"
+          icon={<KeyRound size={16} />}
+          value={desk.hasKey ? "Key saved" : "Not connected"}
+        />
+        <div className="settings-body">
+          <label>
+            API key
+            <div className="key-input">
+              <input
+                type={showKey ? "text" : "password"}
+                autoComplete="off"
+                spellCheck={false}
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder={
+                  desk.hasKey
+                    ? "Paste a new key to replace the saved one"
+                    : "sk-…"
+                }
+                aria-label="OpenAI API key"
+              />
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setShowKey(!showKey)}
+              >
+                {showKey ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>
           <button
-            className="text-button danger"
-            onClick={() =>
-              void act(
-                "SAVE_KEY",
-                { key: "" },
-                "Saved OpenAI key removed.",
-              ).catch(() => {})
-            }
+            type="button"
+            className="primary-button full-button"
+            onClick={() => void saveKey()}
+            disabled={!key.trim() || saving || loading}
           >
-            Remove saved key
+            {saving || loading ? (
+              <LoaderCircle size={16} className="spin" />
+            ) : (
+              <LockKeyhole size={16} />
+            )}
+            Save key & connect
           </button>
-        )}
-      </section>
-      <form onSubmit={save}>
-        <section className="form-card">
-          <div className="section-title">
-            <h2>
-              <Sparkles size={16} />
-              Reply model
-            </h2>
+          <p className="key-privacy">
+            <ShieldCheck size={13} />
+            Stored in this extension’s local browser storage. Never synced or
+            exposed to the WhatsApp page. Anyone with access to your browser
+            profile may access it.
+          </p>
+          {desk.hasKey && (
             <button
-              className="text-button"
-              type="button"
-              disabled={!desk.hasKey || loading}
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  await act("LOAD_MODELS", {}, "Available models refreshed.");
-                } catch {
-                } finally {
-                  setLoading(false);
+              className="text-button danger"
+              onClick={() =>
+                void act(
+                  "SAVE_KEY",
+                  { key: "" },
+                  "Saved OpenAI key removed.",
+                ).catch(() => {})
+              }
+            >
+              Remove saved key
+            </button>
+          )}
+        </div>
+      </details>
+      <form
+        onSubmit={save}
+        onInvalidCapture={(e) =>
+          (e.target as HTMLElement).closest("details")?.setAttribute("open", "")
+        }
+      >
+        <details className="form-card settings-section">
+          <SettingsSummary
+            title="Reply model"
+            icon={<Sparkles size={16} />}
+            value={form.model}
+          />
+          <div className="settings-body">
+            <div className="label-row">
+              <label htmlFor="settings-model">Model</label>
+              <button
+                className="text-button"
+                type="button"
+                disabled={!desk.hasKey || loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await act("LOAD_MODELS", {}, "Available models refreshed.");
+                  } catch {
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                <RefreshCw size={13} className={loading ? "spin" : ""} />
+                Refresh
+              </button>
+            </div>
+            <select
+              id="settings-model"
+              aria-label="Model"
+              value={showCustomModel ? CUSTOM_MODEL : form.model}
+              onChange={(e) => {
+                if (e.target.value === CUSTOM_MODEL) setCustomModel(true);
+                else {
+                  setCustomModel(false);
+                  edit({ model: e.target.value });
                 }
               }}
             >
-              <RefreshCw size={13} className={loading ? "spin" : ""} />
-              Refresh
+              {models.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL}>Custom model ID…</option>
+            </select>
+            {showCustomModel && (
+              <input
+                className="model-custom"
+                aria-label="Custom model ID"
+                value={form.model}
+                required
+                maxLength={150}
+                spellCheck={false}
+                onChange={(e) => edit({ model: e.target.value })}
+                placeholder="e.g. gpt-5-mini"
+              />
+            )}
+            <p className="field-hint">
+              Pick a model or type an ID. Choose one that supports image input
+              and structured output to read pictures. Usage is billed to your
+              OpenAI account.
+            </p>
+          </div>
+        </details>
+        <details className="form-card settings-section">
+          <SettingsSummary
+            title="Your business voice"
+            icon={<MessageCircle size={16} />}
+            value={form.businessName}
+          />
+          <div className="settings-body">
+            <label>
+              Business name
+              <input
+                required
+                maxLength={150}
+                value={form.businessName}
+                onChange={(e) => edit({ businessName: e.target.value })}
+              />
+            </label>
+            <label>
+              How should your assistant reply?
+              <textarea
+                rows={6}
+                maxLength={6000}
+                value={form.businessInstructions}
+                onChange={(e) => edit({ businessInstructions: e.target.value })}
+              />
+            </label>
+          </div>
+        </details>
+        <details className="form-card settings-section">
+          <SettingsSummary
+            title="Automation"
+            icon={<Send size={16} />}
+            value={`Draft ${desk.settings.autoDraft ? "on" : "off"} · ${STORE_RELEASE ? "Manual send" : `Send ${desk.settings.autoSend ? "on" : "off"}`} · All chats ${desk.settings.allChats ? "on" : "off"}`}
+          />
+          <div className="settings-body">
+            <div className="automation-row">
+              <div>
+                <strong>Draft as messages arrive</strong>
+                <small>
+                  Clear questions: 8–12 sec · Other messages: 30–45 sec
+                </small>
+              </div>
+              <Toggle
+                label="Automatically draft new messages"
+                checked={desk.settings.autoDraft}
+                onChange={(autoDraft) => setAutomation({ autoDraft })}
+              />
+            </div>
+            <div className="automation-row">
+              <div>
+                <strong>
+                  {STORE_RELEASE ? "Manual send" : "Auto-send replies"}
+                </strong>
+                <small>
+                  {STORE_RELEASE
+                    ? "Review every draft in WhatsApp and click Send yourself."
+                    : desk.settings.autoSend
+                      ? "Replies are paced by length. Longer answers may arrive in two messages."
+                      : "Drafts stay in the chat box for a human to send."}
+                </small>
+              </div>
+              <Toggle
+                label={
+                  STORE_RELEASE
+                    ? "Manual sending is required"
+                    : "Auto-send replies"
+                }
+                checked={STORE_RELEASE ? false : desk.settings.autoSend}
+                disabled={STORE_RELEASE}
+                onChange={(autoSend) => setAutomation({ autoSend })}
+              />
+            </div>
+            <div className="automation-row">
+              <div>
+                <strong>Reply across all chats</strong>
+                <small>
+                  {desk.settings.allChats
+                    ? "Chats open automatically to reply. Switching pauses while you type."
+                    : "Reply only in the conversation you open"}
+                </small>
+              </div>
+              <Toggle
+                label="Reply to new messages across all chats"
+                checked={desk.settings.allChats}
+                onChange={(allChats) => setAutomation({ allChats })}
+              />
+            </div>
+          </div>
+        </details>
+        <details className="form-card settings-section">
+          <SettingsSummary
+            title="Conversation timestamps"
+            icon={<CalendarClock size={16} />}
+            value={form.dateOrder === "DMY" ? "Day / month / year" : "Month / day / year"}
+          />
+          <div className="settings-body">
+            <label>
+              Date order shown in WhatsApp
+              <select
+                value={form.dateOrder}
+                onChange={(e) =>
+                  edit({ dateOrder: e.target.value as Settings["dateOrder"] })
+                }
+              >
+                <option value="DMY">Day / month / year · 23/10/2026</option>
+                <option value="MDY">Month / day / year · 10/23/2026</option>
+              </select>
+            </label>
+            <p className="field-hint">
+              Match WhatsApp’s displayed dates so the 24-hour countdown is
+              accurate. It tracks the latest observed incoming message; it is
+              an internal follow-up timer.
+            </p>
+          </div>
+        </details>
+        {dirty && (
+          <div className="settings-savebar" role="group" aria-label="Unsaved settings">
+            <span>Unsaved changes</span>
+            <button
+              type="button"
+              className="secondary-button compact-button"
+              onClick={() => setEdits({})}
+              disabled={saving}
+            >
+              Discard
+            </button>
+            <button
+              className="primary-button compact-button"
+              type="submit"
+              disabled={saving}
+            >
+              <Check size={15} />
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
-          <label>
-            Model
-            <select
-              value={form.model}
-              onChange={(e) => setForm({ ...form, model: e.target.value })}
-            >
-              {models.map((id) => (
-                <option key={id}>{id}</option>
-              ))}
-            </select>
-          </label>
-          <label className="custom-model-label">
-            Or enter a model ID
-            <input
-              value={form.model}
-              required
-              maxLength={150}
-              onChange={(e) => setForm({ ...form, model: e.target.value })}
-              placeholder="e.g. gpt-5-mini"
-            />
-          </label>
-          <p className="field-hint">
-            Refresh loads models available to your OpenAI project. Choose one
-            that supports image input, Responses and structured output to read
-            pictures and screenshots. OpenAI usage is billed to your API
-            account.
-          </p>
-        </section>
-        <section className="form-card">
-          <h2>Your business voice</h2>
-          <label>
-            Business name
-            <input
-              required
-              maxLength={150}
-              value={form.businessName}
-              onChange={(e) =>
-                setForm({ ...form, businessName: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            How should your assistant reply?
-            <textarea
-              rows={6}
-              maxLength={6000}
-              value={form.businessInstructions}
-              onChange={(e) =>
-                setForm({ ...form, businessInstructions: e.target.value })
-              }
-            />
-          </label>
-        </section>
-        <section className="form-card">
-          <h2>Conversation timestamps</h2>
-          <label>
-            Date order shown in WhatsApp
-            <select
-              value={form.dateOrder}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  dateOrder: e.target.value as Settings["dateOrder"],
-                })
-              }
-            >
-              <option value="DMY">Day / month / year · 23/10/2026</option>
-              <option value="MDY">Month / day / year · 10/23/2026</option>
-            </select>
-          </label>
-          <p className="field-hint">
-            Match WhatsApp’s displayed dates so the 24-hour countdown is
-            accurate. It tracks the latest observed incoming message; it is an
-            internal follow-up timer.
-          </p>
-        </section>
-        <button
-          className="primary-button full-button"
-          type="submit"
-          disabled={saving}
-        >
-          <Check size={17} />
-          {saving ? "Saving…" : "Save workspace settings"}
-        </button>
+        )}
       </form>
-      <div className="info-note">
-        <Fingerprint size={16} />
-        <p>
-          Knowledge, keys, client notes and follow-ups live in this browser
-          profile. Removing the extension clears its local data. Automatic
-          replies work only in the open chat and pause during human handoff.
-        </p>
+      <div
+        className="info-note one-line"
+        title="Knowledge, keys, client notes and follow-ups live in this browser profile. Removing the extension clears its local data. Automatic replies work only in the open chat and pause during human handoff."
+      >
+        <Fingerprint size={14} />
+        <p>Data lives in this browser profile</p>
       </div>
     </>
   );

@@ -12,6 +12,7 @@ import {
   type PendingReply,
   type ReplyTiming,
   type InboxState,
+  type GeneratePayload,
 } from "./types";
 import {
   safeImageIds,
@@ -21,6 +22,16 @@ import {
   type CapturedImage,
 } from "./media";
 import { automationBlock, extractResponse, selectKnowledge } from "./core";
+import {
+  CALL_SUMMARY_FORMAT,
+  CALL_SUMMARY_INSTRUCTIONS,
+  callParticipants,
+  callSpeakers,
+  callSummaryInput,
+  formatCallDate,
+  renderCallSummary,
+  whisperCallPrompt,
+} from "./call-summary";
 import { formatReply, removeRepeatedOpening } from "./reply";
 import { replyInstructions } from "./instructions";
 import {
@@ -36,6 +47,7 @@ import {
   startCheckout,
 } from "./license";
 import { STORE_RELEASE } from "./release";
+import { transcribeAudio } from "./transcription";
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 function mutate<T>(fn: () => Promise<T>): Promise<T> {
@@ -74,6 +86,15 @@ const ready = (async () => {
 })();
 const safeError = (e: unknown) =>
   e instanceof Error ? e.message : "Something went wrong. Please try again.";
+async function boundedMessage(tabId: number, message: Record<string, unknown>, timeoutMs: number, timeoutMessage: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      chrome.tabs.sendMessage(tabId, message),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
 async function data() {
   await ready;
   const d = await chrome.storage.local.get([
@@ -338,6 +359,269 @@ async function api(path: string, key: string, body?: unknown) {
   }
   return response.json();
 }
+const POLISH_STYLES = ["professional", "shorten", "clarify", "summarize"] as const;
+type PolishStyle = (typeof POLISH_STYLES)[number];
+const POLISH_GUIDANCE: Record<PolishStyle, string> = {
+  professional: "Make the wording polished, courteous and professional while retaining the original level of detail.",
+  shorten: "Make the wording more concise while retaining all material information and the original intent.",
+  clarify: "Make the wording clearer and easier to understand without adding explanations or facts.",
+  summarize: "Summarize the supplied text faithfully, preserving its key points and any questions or requests.",
+};
+const CALL_TRANSCRIPT_MAX_CHARS = 100_000;
+const CALL_TRANSCRIPTION_AUDIO_MAX_BYTES = 20 * 1024 * 1024;
+async function summarizeCall(
+  text: string,
+  meta: { name?: unknown; startedAt?: unknown; speakers?: unknown },
+): Promise<{ text: string }> {
+  if (!text.trim() || text.length > CALL_TRANSCRIPT_MAX_CHARS)
+    throw new Error("The call transcript must contain 1 to 100,000 characters.");
+  const d = await data();
+  if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to summarize a call.");
+  const participants = callParticipants({
+    businessName: d.settings.businessName,
+    customerName: meta.name,
+  });
+  const speakers = callSpeakers(meta.speakers);
+  const response = await api("responses", d.apiKey, {
+    model: d.settings.model,
+    store: false,
+    instructions: CALL_SUMMARY_INSTRUCTIONS,
+    input: [
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: callSummaryInput(text, participants, speakers) },
+        ],
+      },
+    ],
+    max_output_tokens: 4000,
+    text: { format: CALL_SUMMARY_FORMAT },
+  });
+  let raw: unknown;
+  try { raw = JSON.parse(extractResponse(response)); }
+  catch { throw new Error("The selected model returned an invalid call summary. Try again."); }
+  return {
+    text: renderCallSummary(
+      raw,
+      participants,
+      formatCallDate(meta.startedAt, d.settings.dateOrder),
+      speakers,
+    ),
+  };
+}
+async function polishText(text: string, style: PolishStyle): Promise<{ text: string }> {
+  if (!text.trim() || text.length > 5000)
+    throw new Error("Enter text with 1 to 5,000 characters to polish.");
+  if (!POLISH_STYLES.includes(style)) throw new Error("Choose a valid polish style.");
+  const d = await data();
+  if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to polish text.");
+  const response = await api("responses", d.apiKey, {
+    model: d.settings.model,
+    store: false,
+    instructions: `You edit only the operator-provided text. ${POLISH_GUIDANCE[style]} Preserve meaning and every stated fact, amount, name, date, commitment, question, request and negation. Do not invent or imply services, legal, tax, payment, approval or business claims. Do not answer the text or add context. Return only the edited text in the required JSON object.`,
+    input: [{ role: "user", content: [{ type: "input_text", text }] }],
+    max_output_tokens: 6000,
+    text: { format: { type: "json_schema", name: "polished_text", strict: true, schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"], additionalProperties: false } } },
+  });
+  let result: unknown;
+  try { result = JSON.parse(extractResponse(response)).text; }
+  catch { throw new Error("The selected model returned an invalid text edit. Try again."); }
+  if (typeof result !== "string" || !result.trim() || result.length > 5000)
+    throw new Error("The selected model returned text outside the 5,000 character limit. Try again.");
+  return { text: result };
+}
+interface CallCaptureSession {
+  sessionId: string;
+  chatId: string;
+  name: string;
+  startedAt: number;
+  createdAt?: number;
+  phase: "choosing" | "recording";
+  durationMs?: number;
+  bytes?: number;
+  hasMicrophone?: boolean;
+  hasCallAudio?: boolean;
+}
+const callCaptureKey = (tabId: number) => `callCapture:${tabId}`;
+async function readCallCapture(tabId: number): Promise<CallCaptureSession | null> {
+  const result = await chrome.storage.session.get(callCaptureKey(tabId));
+  return (result[callCaptureKey(tabId)] as CallCaptureSession | undefined) ?? null;
+}
+async function removeCallCapture(tabId: number, sessionId: string) {
+  await mutate(async () => {
+    const current = await readCallCapture(tabId);
+    if (current?.sessionId === sessionId)
+      await chrome.storage.session.remove(callCaptureKey(tabId));
+  });
+}
+async function releaseStaleCallCapture(tabId: number, existing: CallCaptureSession) {
+  if (existing.phase === "choosing") {
+    const age = Date.now() - (existing.createdAt ?? existing.startedAt);
+    if (age < 150_000)
+      throw new Error("A call recording picker is already open for this WhatsApp tab.");
+  } else {
+    let status: any;
+    try {
+      status = await boundedMessage(
+        tabId,
+        { type: "CALL_RECORD_STATUS", sessionId: existing.sessionId },
+        8000,
+        "The call recorder did not respond while checking its session.",
+      );
+    } catch {
+      // A reloaded content script has no in-memory session; a later START is
+      // still protected by the content recorder's active-session check.
+      status = null;
+    }
+    const currentStatus = status?.ok ? status.value : null;
+    const hasMatchingRecorder =
+      currentStatus?.sessionId === existing.sessionId &&
+      ["requesting", "recording", "stopping"].includes(currentStatus.phase);
+    if (hasMatchingRecorder)
+      throw new Error("A call recording is already active in this WhatsApp tab.");
+  }
+  await mutate(async () => {
+    const latest = await readCallCapture(tabId);
+    if (latest?.sessionId === existing.sessionId)
+      await chrome.storage.session.remove(callCaptureKey(tabId));
+  });
+}
+async function chooseCallCapture(targetTab: chrome.tabs.Tab): Promise<string> {
+  let requestId: number | undefined;
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      if (requestId !== undefined)
+        chrome.desktopCapture.cancelChooseDesktopMedia(requestId);
+      reject(new Error("The call capture picker timed out. Start recording again."));
+    }, 120_000);
+    try {
+      requestId = chrome.desktopCapture.chooseDesktopMedia(
+        ["tab", "audio"],
+        targetTab,
+        (streamId, options) => {
+          clearTimeout(timeout);
+          if (!streamId) {
+            reject(new Error("Call recording was cancelled in the capture picker."));
+            return;
+          }
+          if (!options?.canRequestAudioTrack) {
+            reject(new Error("Select a tab and enable Share audio to record both sides of the call."));
+            return;
+          }
+          resolve(streamId);
+        },
+      );
+    } catch (error) {
+      clearTimeout(timeout);
+      reject(error);
+    }
+  });
+}
+async function startCallCapture(tabId: number, chatId: unknown) {
+  if (typeof chatId !== "string" || !chatId || chatId.length > 150)
+    throw new Error("Open the WhatsApp conversation for the call first.");
+  const context = await freshContext(tabId);
+  if (!context || context.chatId !== chatId)
+    throw new Error("The selected WhatsApp conversation changed. Select it again before recording.");
+  const targetTab = await chrome.tabs.get(tabId);
+  if (!targetTab.url?.startsWith("https://web.whatsapp.com/"))
+    throw new Error("Open this call in a secure WhatsApp Web tab before recording.");
+  const session: CallCaptureSession = {
+    sessionId: crypto.randomUUID(),
+    chatId,
+    name: context.name.slice(0, 150),
+    startedAt: Date.now(),
+    createdAt: Date.now(),
+    phase: "choosing",
+  };
+  const existing = await readCallCapture(tabId);
+  if (existing) await releaseStaleCallCapture(tabId, existing);
+  await mutate(async () => {
+    if (await readCallCapture(tabId))
+      throw new Error("A call recording is already active in this WhatsApp tab.");
+    await chrome.storage.session.set({ [callCaptureKey(tabId)]: session });
+  });
+  let startAttempted = false;
+  try {
+    const streamId = await chooseCallCapture(targetTab);
+    startAttempted = true;
+    const result = await boundedMessage(
+      tabId,
+      {
+        type: "CALL_RECORD_START",
+        sessionId: session.sessionId,
+        streamId,
+        chatId: session.chatId,
+        name: session.name,
+      },
+      30000,
+      "Call recording did not start. Check WhatsApp and try again.",
+    );
+    if (!result?.ok) throw new Error(result?.error ?? "Call recording could not start.");
+    const status = result.value;
+    if (
+      status?.phase !== "recording" ||
+      status.hasCallAudio !== true ||
+      status.hasMicrophone !== true ||
+      typeof status.startedAt !== "number"
+    )
+      throw new Error("Both WhatsApp call audio and microphone audio must be active before recording.");
+    session.phase = "recording";
+    session.startedAt = status.startedAt;
+    session.durationMs = status.durationMs;
+    session.bytes = status.bytes;
+    session.hasCallAudio = status.hasCallAudio;
+    session.hasMicrophone = status.hasMicrophone;
+    await chrome.storage.session.set({ [callCaptureKey(tabId)]: session });
+    return {
+      sessionId: session.sessionId,
+      chatId: session.chatId,
+      name: session.name,
+      startedAt: status.startedAt,
+      durationMs: status.durationMs,
+      bytes: status.bytes,
+      hasCallAudio: status.hasCallAudio,
+      hasMicrophone: status.hasMicrophone,
+      phase: status.phase,
+    };
+  } catch (error) {
+    if (startAttempted)
+      await chrome.tabs.sendMessage(tabId, {
+        type: "CALL_RECORD_CANCEL",
+        sessionId: session.sessionId,
+      }).catch(() => {});
+    await removeCallCapture(tabId, session.sessionId);
+    throw error;
+  }
+}
+async function relayCallCapture(tabId: number, type: "CALL_RECORD_STATUS" | "CALL_RECORD_STOP" | "CALL_RECORD_CANCEL", sessionId: unknown) {
+  if (typeof sessionId !== "string" || !sessionId)
+    throw new Error("The call recording session is invalid.");
+  const session = await readCallCapture(tabId);
+  if (!session || session.sessionId !== sessionId)
+    throw new Error("This call recording session has ended. Start a new recording.");
+  const result = await boundedMessage(
+    tabId,
+    { type, sessionId },
+    type === "CALL_RECORD_STOP" ? 60000 : 8000,
+    type === "CALL_RECORD_STOP"
+      ? "Call recording did not finish in time. Check WhatsApp before retrying."
+      : "The call recorder did not respond. Refresh WhatsApp and try again.",
+  );
+  if (!result?.ok) throw new Error(result?.error ?? "The call recording action could not be completed.");
+  if (type === "CALL_RECORD_STOP" || type === "CALL_RECORD_CANCEL")
+    await removeCallCapture(tabId, sessionId);
+  const value = result.value ?? result;
+  if (type === "CALL_RECORD_STOP")
+    return {
+      ...value,
+      startedAt: session.startedAt,
+      hasCallAudio: session.hasCallAudio === true,
+      hasMicrophone: session.hasMicrophone === true,
+      phase: "stopped",
+    };
+  return value;
+}
 interface InboxLease {
   tabId: number;
   at: number;
@@ -378,11 +662,16 @@ async function saveDraft(tabId: number, draft: Draft) {
     });
   });
 }
+async function savePanelDraft(tabId: number, draft: Draft) {
+  // Manual assistance is ephemeral panel state. It must not become a chat draft.
+  await chrome.storage.session.set({ [`draft:${tabId}`]: draft });
+}
 async function generate(
   tabId: number,
   automatic = false,
   expectedIncomingId?: string,
   inboxToken?: string,
+  manual: GeneratePayload = {},
 ): Promise<Draft> {
   if (activeGenerations.has(tabId))
     throw new Error("A reply is already being prepared. Please wait.");
@@ -393,6 +682,7 @@ async function generate(
       automatic,
       expectedIncomingId,
       inboxToken,
+      manual,
     );
   } finally {
     activeGenerations.delete(tabId);
@@ -403,11 +693,39 @@ async function generateReply(
   automatic = false,
   expectedIncomingId?: string,
   inboxToken?: string,
+  manual: GeneratePayload = {},
 ): Promise<Draft> {
   if (inboxToken) await assertInboxControl(tabId, inboxToken);
-  const context = await freshContext(tabId);
+  const observedContext = await freshContext(tabId);
   const d = await data();
-  if (!context?.chatId || !context.messages.length)
+  const instruction =
+    typeof manual.instruction === "string"
+      ? manual.instruction.trim().slice(0, 5000)
+      : "";
+  if (manual.instruction !== undefined && typeof manual.instruction !== "string")
+    throw new Error("Enter a text instruction for manual assistance.");
+  if (typeof manual.instruction === "string" && manual.instruction.length > 5000)
+    throw new Error("Manual instructions must be 5,000 characters or fewer.");
+  const assistOnly = manual.assistOnly === true;
+  const manualTask =
+    instruction ||
+    (assistOnly
+      ? observedContext?.messages.length
+        ? "Suggest a helpful reply to this conversation."
+        : "What can you help me with using the approved business information?"
+      : "Draft a helpful reply to the current conversation.");
+  const context: ChatContext = observedContext ?? {
+    chatId: "",
+    name: "General assistance",
+    isGroup: false,
+    messages: [],
+    lastIncomingAt: null,
+    lastIncomingId: null,
+    composerEmpty: true,
+    atBottom: true,
+    observedAt: Date.now(),
+  };
+  if (!assistOnly && (!context.chatId || !context.messages.length))
     throw new Error("Open a client conversation with visible messages first.");
   if (expectedIncomingId && context.lastIncomingId !== expectedIncomingId)
     throw new Error(
@@ -416,13 +734,13 @@ async function generateReply(
   const allowedOutgoing = new Set(
     context.messages.filter((m) => m.direction === "out").map((m) => m.id),
   );
-  if (context.isGroup)
+  if (!assistOnly && automatic && context.isGroup)
     throw new Error(
       "Choose an individual client conversation. Group replies are not supported.",
     );
   if (!d.apiKey)
     throw new Error("Add your OpenAI key in Settings to start drafting.");
-  if (!d.knowledge.length)
+  if (automatic && !d.knowledge.length)
     throw new Error(
       "Add your business knowledge first so replies use your information.",
     );
@@ -433,7 +751,7 @@ async function generateReply(
     );
     if (reason) throw new Error(reason);
   }
-  if (!context.composerEmpty)
+  if (automatic && !context.composerEmpty)
     throw new Error(
       "Your chat box already contains a message. Send or clear it before drafting.",
     );
@@ -443,6 +761,7 @@ async function generateReply(
     context.messages
       .slice(-5)
       .map((m) => m.text)
+      .concat(manualTask ? [manualTask] : [])
       .join("\n"),
   );
   let captured: CapturedImage[] = [];
@@ -480,7 +799,7 @@ async function generateReply(
   const response = await api("responses", d.apiKey, {
     model: d.settings.model,
     store: false,
-    instructions: replyInstructions(d.settings),
+    instructions: replyInstructions(d.settings, automatic ? "" : manualTask, assistOnly),
     input: vision.input,
     max_output_tokens: 2500,
     text: {
@@ -536,13 +855,15 @@ async function generateReply(
     throw new Error("The model returned an invalid reply. Please try again.");
   const receiptReason = receiptReview(output.imageReview, output.receipt);
   const draft: Draft = {
-    reply: formatReply(
-      removeRepeatedOpening(
-        output.reply,
-        context.messages.some((m) => m.direction === "out"),
-        d.settings.businessName,
-      ),
-    ),
+    reply: assistOnly
+      ? output.reply.trim()
+      : formatReply(
+          removeRepeatedOpening(
+            output.reply,
+            context.messages.some((m) => m.direction === "out"),
+            d.settings.businessName,
+          ),
+        ),
     needsHuman:
       output.needsHuman ||
       vision.missingIncoming ||
@@ -564,30 +885,57 @@ async function generateReply(
     throw new Error(
       "The model repeated a greeting without answering. Please draft again.",
     );
-  const current = await freshContext(tabId);
-  if (
-    !current ||
-    current.chatId !== context.chatId ||
-    current.lastIncomingId !== context.lastIncomingId ||
-    current.messages.some(
+  const current = assistOnly ? null : await freshContext(tabId);
+  const conversationStillMatches =
+    !!current &&
+    current.chatId === context.chatId &&
+    current.lastIncomingId === context.lastIncomingId &&
+    !current.messages.some(
       (m) => m.direction === "out" && !allowedOutgoing.has(m.id),
-    )
-  )
+    );
+  if (automatic && !conversationStillMatches)
     throw new Error(
       "The conversation changed while drafting. Generate a fresh reply.",
     );
   const latest = await data();
   if (
     automatic &&
-    (!latest.settings.autoDraft || latest.clients[current.chatId]?.human)
+    (!latest.settings.autoDraft || latest.clients[current!.chatId]?.human)
   )
     throw new Error("Automatic drafting paused. A human can draft when ready.");
+  const panelOnly =
+    assistOnly ||
+    !conversationStillMatches ||
+    !current ||
+    !context.chatId ||
+    current.isGroup ||
+    !current.composerEmpty ||
+    !current.atBottom ||
+    !current.lastIncomingId ||
+    !current.lastIncomingAt ||
+    Date.now() - current.lastIncomingAt >= 24 * 60 * 60 * 1000 ||
+    !!latest.clients[context.chatId]?.human;
+  if (panelOnly) {
+    draft.contextName = observedContext?.name ?? "General assistance";
+    draft.placement = "Suggestion kept in Desk for review";
+    draft.placementReason = "panel-only";
+    await savePanelDraft(tabId, draft);
+    await setActivity(tabId, draft.placement);
+    return draft;
+  }
   const send =
+    automatic &&
     latest.settings.autoSend &&
     !draft.needsHuman &&
-    !automationBlock(current, latest.clients[current.chatId]?.human ?? false);
+    !!current &&
+    !automationBlock(
+      current,
+      latest.clients[current.chatId]?.human ?? false,
+    );
   const fullReply = draft.reply;
   const parts = send ? replyParts(fullReply) : [fullReply];
+  draft.contextName = current?.name ?? context.name;
+  draft.placementReason = send ? "automatic-send" : "chat-draft";
   await saveDraft(tabId, draft);
   for (let i = 0; i < parts.length; i++) {
     if (send)
@@ -633,6 +981,7 @@ async function generateReply(
     : draft.needsHuman
       ? "In chat · human review needed"
       : "In chat · ready for your review";
+  draft.placementReason = send ? "automatic-send" : "chat-draft";
   await saveDraft(tabId, draft);
   await setActivity(tabId, draft.placement);
   return draft;
@@ -1271,6 +1620,60 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
       await chrome.storage.local.set({ models });
       return { models };
     }
+    case "TRANSCRIBE_AUDIO": {
+      await assertLicenseAccess();
+      const d = await data();
+      if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to use voice input.");
+      return transcribeAudio(m.audio, m.mimeType, d.apiKey);
+    }
+    case "CALL_RECORD_START":
+      await assertLicenseAccess();
+      return startCallCapture(tabId, m.chatId);
+    case "CALL_RECORD_STATUS":
+      return relayCallCapture(tabId, "CALL_RECORD_STATUS", m.sessionId);
+    case "CALL_RECORD_STOP":
+      return relayCallCapture(tabId, "CALL_RECORD_STOP", m.sessionId);
+    case "CALL_RECORD_CANCEL":
+      await relayCallCapture(tabId, "CALL_RECORD_CANCEL", m.sessionId);
+      return {};
+    case "TRANSCRIBE_CALL": {
+      await assertLicenseAccess();
+      const d = await data();
+      if (!d.apiKey) throw new Error("Add your OpenAI key in Settings to transcribe a call.");
+      const name = typeof m.name === "string" ? m.name.slice(0, 150) : undefined;
+      const spk = callSpeakers(m.speakers);
+      const hint = whisperCallPrompt({
+        businessName: d.settings.businessName,
+        businessSpeaker: spk.business,
+        customerName: name,
+        customerSpeaker: spk.customer,
+      });
+      return transcribeAudio(m.audio, m.mimeType, d.apiKey, CALL_TRANSCRIPTION_AUDIO_MAX_BYTES, CALL_TRANSCRIPT_MAX_CHARS, hint ?? undefined);
+    }
+    case "SUMMARIZE_CALL": {
+      await assertLicenseAccess();
+      if (typeof m.text !== "string") throw new Error("Provide the call transcript to summarize.");
+      return summarizeCall(m.text, { name: m.name, startedAt: m.startedAt, speakers: m.speakers });
+    }
+    case "POLISH_TEXT": {
+      await assertLicenseAccess();
+      if (typeof m.text !== "string" || m.text.length > 5000)
+        throw new Error("Enter text with 1 to 5,000 characters to polish.");
+      return polishText(m.text, m.style);
+    }
+    case "RECORD_AUDIO_START":
+    case "RECORD_AUDIO_STOP":
+    case "RECORD_AUDIO_CANCEL": {
+      const timeoutMs = m.type === "RECORD_AUDIO_START" ? 30000 : m.type === "RECORD_AUDIO_STOP" ? 8000 : 5000;
+      const timeoutMessage = m.type === "RECORD_AUDIO_START"
+        ? "Microphone permission took too long. Check the browser permission prompt and try again."
+        : m.type === "RECORD_AUDIO_STOP" ? "Recording did not finish in time. Try again." : "Recording could not be cancelled in time. Try again.";
+      const result = await boundedMessage(tabId, { type: m.type }, timeoutMs, timeoutMessage);
+      if (!result?.ok) throw new Error(result?.error ?? (m.type === "RECORD_AUDIO_START"
+        ? "Could not access the microphone. Check permission and try again."
+        : "The recording action could not be completed. Try again."));
+      return result.value ?? result;
+    }
     case "ADD_KNOWLEDGE": {
       const k = m.document;
       const text = String(k?.text ?? "").trim();
@@ -1348,9 +1751,12 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
     }
     case "GENERATE": {
       await assertLicenseAccess();
-      await cancelPending(tabId);
+      if (m.assistOnly !== true) await cancelPending(tabId);
       try {
-        return await generate(tabId);
+        return await generate(tabId, false, undefined, undefined, {
+          instruction: m.instruction,
+          assistOnly: m.assistOnly === true,
+        });
       } catch (e) {
         if (!(await pendingReplies())[tabId])
           await setActivity(tabId, safeError(e));
@@ -1374,6 +1780,45 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
       });
       if (!r?.ok) throw new Error(r?.error ?? "Could not place the draft.");
       return {};
+    }
+    case "PLACE_MESSAGE": {
+      const text = typeof m.text === "string" ? m.text.trim() : "";
+      const chatId = typeof m.chatId === "string" ? m.chatId : "";
+      if (!text || text.length > 8000)
+        throw new Error("The dictated message is empty or too long.");
+      if (!chatId || chatId.length > 150)
+        throw new Error("Select a WhatsApp conversation before placing dictation.");
+      const ctx = await freshContext(tabId);
+      if (!ctx || ctx.chatId !== chatId)
+        throw new Error("The selected WhatsApp conversation changed. Select it again before placing dictation.");
+      if (!ctx.composerEmpty)
+        throw new Error(`Your WhatsApp message box already has text. The transcript is still in ${APP_NAME}; clear the message box before placing it.`);
+      const paused = await boundedMessage(tabId, { type: "INBOX_PAUSE" }, 5000,
+        "Inbox monitoring could not be paused. Try placing the transcript again.");
+      if (!paused?.ok)
+        throw new Error(paused?.error ?? "Inbox monitoring could not be paused for manual dictation.");
+      const placed = await boundedMessage(tabId, { type: "PLACE_MESSAGE", chatId, text }, 12000,
+        "WhatsApp did not respond while placing the transcript. Check the composer before trying again.");
+      if (!placed?.ok) throw new Error(placed?.error ?? "Could not place the transcript in WhatsApp.");
+      return { placed: true };
+    }
+    case "SYNC_MESSAGE": {
+      const chatId = typeof m.chatId === "string" ? m.chatId : "";
+      const text = typeof m.text === "string" ? m.text : null;
+      const expectedText = typeof m.expectedText === "string" ? m.expectedText : null;
+      if (!chatId || chatId.length > 150 || text === null || expectedText === null || text.length > 5000 || expectedText.length > 5000)
+        throw new Error("The WhatsApp message could not be synced.");
+      const ctx = await freshContext(tabId);
+      if (!ctx || ctx.chatId !== chatId)
+        throw new Error("The selected WhatsApp conversation changed. Select it again before syncing.");
+      await cancelPending(tabId);
+      const paused = await boundedMessage(tabId, { type: "INBOX_PAUSE" }, 5000,
+        "Inbox monitoring could not be paused. Try syncing the message again.");
+      if (!paused?.ok) throw new Error(paused?.error ?? "Inbox monitoring could not be paused for manual editing.");
+      const result = await boundedMessage(tabId, { type: "SYNC_MESSAGE", chatId, text, expectedText }, 12000,
+        "WhatsApp did not respond while syncing. Check the composer before trying again.");
+      if (!result?.ok) throw new Error(result?.error ?? "Could not sync the WhatsApp message.");
+      return { synced: true, text };
     }
     case "ADD_FOLLOW_UP": {
       const ctx = await freshContext(tabId);
@@ -1481,6 +1926,7 @@ chrome.tabs.onRemoved.addListener((id) => {
     `activity:${id}`,
     `replyTiming:${id}`,
     `inbox:${id}`,
+    callCaptureKey(id),
   ]);
 });
 void ready

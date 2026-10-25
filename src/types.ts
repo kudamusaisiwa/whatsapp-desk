@@ -62,9 +62,15 @@ export interface Draft {
   reason: string;
   sources: string[];
   chatId: string;
+  contextName?: string;
   incomingId: string | null;
   createdAt: number;
   placement?: string;
+  placementReason?: "panel-only" | "chat-draft" | "automatic-send";
+}
+export interface GeneratePayload {
+  instruction?: string;
+  assistOnly?: boolean;
 }
 export interface ReplyTiming {
   chatId: string;

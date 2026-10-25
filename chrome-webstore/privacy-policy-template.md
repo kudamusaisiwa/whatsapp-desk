@@ -25,6 +25,28 @@ service. Stripe receives only the information needed to process the optional
 one-time license purchase through its hosted Checkout page; payment-card data
 is handled by Stripe, not by the extension.
 
+Optional voice dictation starts only after the user clicks the microphone and
+grants browser access. The recording is sent to OpenAI for transcription using
+the user's saved key. The extension does not save the recording. The returned
+text is editable in the panel and synced to the selected WhatsApp composer.
+
+Optional call recording starts only after the user clicks Record and chooses
+the active WhatsApp Web tab with **Share audio** enabled in Chrome's picker. It
+records tab audio and the user's microphone for up to 60 minutes and 20 MiB;
+video is not recorded and audio is not saved by the extension. After Stop, the
+audio is sent to OpenAI for transcription using the saved key, together with
+any business, participant and speaker names the user has provided as a
+transcription hint. For the optional customer-facing call summary, the
+transcript text, the configured business name and the participant and speaker
+names are sent to OpenAI. The call summary remains editable and is synced
+only to the original chat with a compare-and-set check against the current
+composer. The extension does not send the summary or any
+message.
+Optional text polishing sends only the selected operator text to OpenAI with
+the saved key, without chat history or business knowledge. The user reviews
+the text and presses WhatsApp's Send button. AI assistance remains available
+as a separate action.
+
 The licensing service receives an installation identifier and license status
 needed to provide the seven-day trial and verify the $9.99 purchase. It must
 not receive WhatsApp conversations, business documents or the OpenAI key.

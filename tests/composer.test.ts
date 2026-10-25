@@ -16,11 +16,14 @@ async function fixture({
   allowSend = true,
   newIncoming = false,
   pasteMode = "preserve",
+  group = false,
+  stale = false,
+  latestOutgoing = false,
 } = {}) {
-  const now = new Date();
+  const now = new Date(Date.now() - (stale ? 2 * 24 * 3600000 : 0));
   const timestamp = `[${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}, ${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}] Test: `;
   const dom = new JSDOM(
-    `<div id="app"><div id="main"><header><span title="Fixture Client">Fixture Client</span></header><section id="messages"><div class="message-in" data-id="false_123456@lid_IN"><div data-pre-plain-text="${timestamp}"><span class="selectable-text">Hello</span></div></div></section><footer><div role="textbox" contenteditable="true">${occupied ? "A human is writing" : ""}</div><button aria-label="Send"><span data-icon="send"></span></button></footer></div></div>`,
+    `<div id="app"><div id="main"><header><span title="Fixture Client">Fixture Client</span>${group ? '<span data-testid="group-participants">Group</span>' : ""}</header><section id="messages"><div class="message-in" data-id="false_123456@lid_IN"><div data-pre-plain-text="${timestamp}"><span class="selectable-text">Hello</span></div></div>${latestOutgoing ? `<div class="message-out" data-id="true_123456@lid_OUT"><div data-pre-plain-text="${timestamp}"><span class="selectable-text">Thanks</span></div></div>` : ""}</section><footer><div role="textbox" contenteditable="true">${occupied ? "A human is writing" : ""}</div><button aria-label="Send"><span data-icon="send"></span></button></footer></div></div>`,
     {
       url: "https://web.whatsapp.com/",
       runScripts: "outside-only",
@@ -107,6 +110,10 @@ async function fixture({
     _ui: boolean,
     text: string,
   ) => {
+    if (command === "delete") {
+      input.textContent = "";
+      return true;
+    }
     input.textContent += command === "insertLineBreak" ? "\n" : text;
     onInsert();
     return true;
@@ -141,7 +148,41 @@ async function fixture({
         resolve,
       ),
     );
-  return { dom, input, place, sends: () => sends };
+  const placeMessage = (patch: any = {}, sender: any = {
+    id: "fixture",
+    url: "chrome-extension://fixture/background.js",
+  }): Promise<any> =>
+    new Promise((resolve) =>
+      listener(
+        {
+          type: "PLACE_MESSAGE",
+          chatId: "123456@lid",
+          text: "Dictated message",
+          send: true,
+          ...patch,
+        },
+        sender,
+        resolve,
+      ),
+    );
+  const syncMessage = (patch: any = {}, sender: any = {
+    id: "fixture",
+    url: "chrome-extension://fixture/background.js",
+  }): Promise<any> =>
+    new Promise((resolve) =>
+      listener(
+        {
+          type: "SYNC_MESSAGE",
+          chatId: "123456@lid",
+          expectedText: "",
+          text: "A synchronized message",
+          ...patch,
+        },
+        sender,
+        resolve,
+      ),
+    );
+  return { dom, input, place, placeMessage, syncMessage, listener, sends: () => sends };
 }
 test("the actual content script puts a default suggestion in the composer without a Send click", async () => {
   const f = await fixture();
@@ -215,6 +256,85 @@ test("multiline WhatsApp formatting survives paste without sending", async () =>
       "Hi! Here is the starting checklist.\n\n*Documents*\n- Valid passport\n- Email address\n\nWould you like help with the form?";
     assert.equal((await f.place({ text })).ok, true);
     assert.equal(f.input.textContent, text);
+    assert.equal(f.sends(), 0);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test("multiline dictation is placed for review and never clicks WhatsApp Send", async () => {
+  const f = await fixture();
+  try {
+    const text = "Hello from voice.\n\nPlease send me the requirements.";
+    const result = await f.placeMessage({ text, send: true });
+    assert.equal(result.ok, true);
+    assert.equal(f.input.textContent, text);
+    assert.equal(f.sends(), 0);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test("dictation refuses a changed target chat and preserves an occupied composer", async () => {
+  const switched = await fixture();
+  try {
+    const result = await switched.placeMessage({ chatId: "other@lid" });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /conversation changed/);
+    assert.equal(switched.input.textContent, "");
+    assert.equal(switched.sends(), 0);
+  } finally {
+    switched.dom.window.close();
+  }
+  const occupied = await fixture({ occupied: true });
+  try {
+    const result = await occupied.placeMessage();
+    assert.equal(result.ok, false);
+    assert.match(result.error, /transcript is still in Desk AI for WhatsApp/);
+    assert.equal(occupied.input.textContent, "A human is writing");
+    assert.equal(occupied.sends(), 0);
+  } finally {
+    occupied.dom.window.close();
+  }
+});
+test("dictation permits a matching group, stale chat, and latest business message", async () => {
+  for (const options of [
+    { group: true },
+    { stale: true },
+    { latestOutgoing: true },
+  ]) {
+    const f = await fixture(options);
+    try {
+      const result = await f.placeMessage({ text: "A dictated note." });
+      assert.equal(result.ok, true);
+      assert.equal(f.input.textContent, "A dictated note.");
+      assert.equal(f.sends(), 0);
+    } finally {
+      f.dom.window.close();
+    }
+  }
+});
+test("a new incoming message during dictation placement does not block the manual text", async () => {
+  const f = await fixture({ newIncoming: true });
+  try {
+    const result = await f.placeMessage({ text: "Please call me back." });
+    assert.equal(result.ok, true);
+    assert.equal(f.input.textContent, "Please call me back.");
+    assert.equal(f.sends(), 0);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test("content callers cannot forge the background-only manual placement route", async () => {
+  const f = await fixture();
+  try {
+    let response: any;
+    const result = f.listener(
+      { type: "PLACE_MESSAGE", chatId: "123456@lid", text: "Spoofed" },
+      { id: "fixture", url: "https://web.whatsapp.com/" },
+      (value: any) => (response = value),
+    );
+    assert.equal(result, undefined);
+    assert.equal(response, undefined);
+    assert.equal(f.input.textContent, "");
     assert.equal(f.sends(), 0);
   } finally {
     f.dom.window.close();
@@ -317,4 +437,52 @@ test("the installed content path reads the matching chat picture on demand and r
   } finally {
     f.dom.window.close();
   }
+});
+
+test("SYNC_MESSAGE fills and replaces only the expected composer text without sending", async () => {
+  const f = await fixture();
+  try {
+    const first = await f.syncMessage({ text: "First line.\n\nSecond line?" });
+    assert.equal(first.ok, true);
+    assert.equal(first.synced, true);
+    assert.equal(first.text, "First line.\n\nSecond line?");
+    assert.equal(f.input.textContent, "First line.\n\nSecond line?");
+    const replaced = await f.syncMessage({ expectedText: "First line.\n\nSecond line?", text: "Polished transcript." });
+    assert.equal(replaced.ok, true);
+    assert.equal(f.input.textContent, "Polished transcript.");
+    assert.equal(f.sends(), 0);
+  } finally { f.dom.window.close(); }
+});
+
+test("SYNC_MESSAGE refuses human edits and only clears text that matches its compare value", async () => {
+  const f = await fixture({ occupied: true });
+  try {
+    const conflict = await f.syncMessage({ expectedText: "Managed draft", text: "" });
+    assert.equal(conflict.ok, false);
+    assert.match(conflict.error, /message changed/);
+    assert.equal(f.input.textContent, "A human is writing");
+    const clear = await f.syncMessage({ expectedText: "A human is writing", text: "" });
+    assert.equal(clear.ok, true);
+    assert.equal(f.input.textContent, "");
+    assert.equal(f.sends(), 0);
+  } finally { f.dom.window.close(); }
+});
+
+test("SYNC_MESSAGE never retries partial paste and rejects wrong chats or senders", async () => {
+  const f = await fixture({ pasteMode: "partial" });
+  try {
+    const result = await f.syncMessage({ text: "First line.\n\nSecond line." });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /part of the message/);
+    assert.equal(f.input.textContent, "First line");
+    assert.equal(f.sends(), 0);
+    const wrongChat = await f.syncMessage({ chatId: "other@lid", text: "Nope" });
+    assert.equal(wrongChat.ok, false);
+    assert.match(wrongChat.error, /conversation changed/);
+    let spoofResponded = false;
+    const spoofReturn = f.listener({ type: "SYNC_MESSAGE", chatId: "123456@lid", expectedText: "", text: "Spoof" }, { id: "fixture", url: "https://example.test/" }, () => { spoofResponded = true; });
+    assert.equal(spoofReturn, undefined);
+    assert.equal(spoofResponded, false);
+    assert.equal(f.sends(), 0);
+  } finally { f.dom.window.close(); }
 });
