@@ -498,6 +498,21 @@ async function removeCallCapture(tabId: number, sessionId: string) {
       await chrome.storage.session.remove(callCaptureKey(tabId));
   });
 }
+const pendingCallPickers = new Map<number, { sessionId: string; cancel: () => void }>();
+async function cancelCallCaptureOnCustomerChange(tabId: number, nextChatId: string | null) {
+  const current = await readCallCapture(tabId);
+  if (!current || current.chatId === nextChatId) return;
+  if (current.phase === "choosing") {
+    const picker = pendingCallPickers.get(tabId);
+    if (picker?.sessionId === current.sessionId) picker.cancel();
+  } else {
+    await chrome.tabs.sendMessage(tabId, {
+      type: "CALL_RECORD_CANCEL",
+      sessionId: current.sessionId,
+    }).catch(() => {});
+  }
+  await removeCallCapture(tabId, current.sessionId);
+}
 async function releaseStaleCallCapture(tabId: number, existing: CallCaptureSession) {
   if (existing.phase === "choosing") {
     const age = Date.now() - (existing.createdAt ?? existing.startedAt);
@@ -530,34 +545,54 @@ async function releaseStaleCallCapture(tabId: number, existing: CallCaptureSessi
       await chrome.storage.session.remove(callCaptureKey(tabId));
   });
 }
-async function chooseCallCapture(targetTab: chrome.tabs.Tab): Promise<string> {
+async function chooseCallCapture(tabId: number, targetTab: chrome.tabs.Tab, sessionId: string): Promise<string> {
   let requestId: number | undefined;
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      clearTimeout(timeout);
+      if (pendingCallPickers.get(tabId)?.sessionId === sessionId)
+        pendingCallPickers.delete(tabId);
+    };
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const cancel = () => {
       if (requestId !== undefined)
         chrome.desktopCapture.cancelChooseDesktopMedia(requestId);
-      reject(new Error("The call capture picker timed out. Start recording again."));
+      rejectOnce(new Error("The WhatsApp customer changed. Start the call recording again."));
+    };
+    pendingCallPickers.set(tabId, { sessionId, cancel });
+    timeout = setTimeout(() => {
+      if (requestId !== undefined)
+        chrome.desktopCapture.cancelChooseDesktopMedia(requestId);
+      rejectOnce(new Error("The call capture picker timed out. Start recording again."));
     }, 120_000);
     try {
       requestId = chrome.desktopCapture.chooseDesktopMedia(
         ["tab", "audio"],
         targetTab,
         (streamId, options) => {
-          clearTimeout(timeout);
+          if (settled) return;
           if (!streamId) {
-            reject(new Error("Call recording was cancelled in the capture picker."));
+            rejectOnce(new Error("Call recording was cancelled in the capture picker."));
             return;
           }
           if (!options?.canRequestAudioTrack) {
-            reject(new Error("Select a tab and enable Share audio to record both sides of the call."));
+            rejectOnce(new Error("Select a tab and enable Share audio to record both sides of the call."));
             return;
           }
+          settled = true;
+          cleanup();
           resolve(streamId);
         },
       );
     } catch (error) {
-      clearTimeout(timeout);
-      reject(error);
+      rejectOnce(error);
     }
   });
 }
@@ -587,7 +622,11 @@ async function startCallCapture(tabId: number, chatId: unknown) {
   });
   let startAttempted = false;
   try {
-    const streamId = await chooseCallCapture(targetTab);
+    const streamId = await chooseCallCapture(tabId, targetTab, session.sessionId);
+    const beforeStart = await readCallCapture(tabId);
+    const beforeStartContext = await freshContext(tabId);
+    if (beforeStart?.sessionId !== session.sessionId || beforeStartContext?.chatId !== session.chatId)
+      throw new Error("The WhatsApp customer changed. Start the call recording again.");
     startAttempted = true;
     const result = await boundedMessage(
       tabId,
@@ -610,6 +649,10 @@ async function startCallCapture(tabId: number, chatId: unknown) {
       typeof status.startedAt !== "number"
     )
       throw new Error("Both WhatsApp call audio and microphone audio must be active before recording.");
+    const afterStart = await readCallCapture(tabId);
+    const afterStartContext = await freshContext(tabId);
+    if (afterStart?.sessionId !== session.sessionId || afterStartContext?.chatId !== session.chatId)
+      throw new Error("The WhatsApp customer changed. Start the call recording again.");
     session.phase = "recording";
     session.startedAt = status.startedAt;
     session.durationMs = status.durationMs;
@@ -1088,6 +1131,7 @@ async function recordContext(raw: ChatContext | null, tabId: number) {
     };
   }
   if ((prev?.chatId ?? null) !== (c?.chatId ?? null)) {
+    await cancelCallCaptureOnCustomerChange(tabId, c?.chatId ?? null);
     contextEpochByTab.set(tabId, (contextEpochByTab.get(tabId) ?? 0) + 1);
     await chrome.storage.session.remove(`draft:${tabId}`);
     await setActivity(tabId, "");

@@ -110,6 +110,8 @@ async function harness(
   };
   let callTranscriptionOutput = "The customer will send the signed form tomorrow.";
   let captureChoice = { streamId: "fixture-stream", canRequestAudioTrack: true };
+  let holdCallCaptureChoice = false;
+  let pendingCallCaptureChoice: ((streamId: string, options: any) => void) | null = null;
   let callStatusMode: "active" | "missing" | "idle" = "active";
   let targetTabUrl = "https://web.whatsapp.com/";
   const desktopCaptureCalls: any[] = [];
@@ -210,7 +212,8 @@ async function harness(
     desktopCapture: {
       chooseDesktopMedia: (sources: string[], target: any, callback: Function) => {
         desktopCaptureCalls.push({ sources: [...sources], target: structuredClone(target) });
-        queueMicrotask(() => callback(captureChoice.streamId, { canRequestAudioTrack: captureChoice.canRequestAudioTrack }));
+        if (holdCallCaptureChoice) pendingCallCaptureChoice = callback as (streamId: string, options: any) => void;
+        else queueMicrotask(() => callback(captureChoice.streamId, { canRequestAudioTrack: captureChoice.canRequestAudioTrack }));
         return 17;
       },
       cancelChooseDesktopMedia: (id: number) => desktopCaptureCancels.push(id),
@@ -401,6 +404,12 @@ async function harness(
     setCallSummaryOutput: (value: unknown) => { callSummaryOutput = value; },
     setCallTranscriptionOutput: (text: string) => { callTranscriptionOutput = text; },
     setCaptureChoice: (choice: { streamId: string; canRequestAudioTrack: boolean }) => { captureChoice = choice; },
+    setHoldCallCaptureChoice: (hold: boolean) => { holdCallCaptureChoice = hold; },
+    completeCallCaptureChoice: (streamId = captureChoice.streamId, options = { canRequestAudioTrack: captureChoice.canRequestAudioTrack }) => {
+      const callback = pendingCallCaptureChoice;
+      pendingCallCaptureChoice = null;
+      callback?.(streamId, options);
+    },
     setCallStatusMode: (mode: "active" | "missing" | "idle") => { callStatusMode = mode; },
     setTargetTabUrl: (url: string) => { targetTabUrl = url; },
     desktopCaptureCalls,
@@ -1566,6 +1575,35 @@ test("CALL_RECORD_START rejects a changed chat, an insecure tab, picker cancel a
   assert.match(noAudio.error, /enable Share audio/);
   assert.equal(h.contentRequests.some((m) => m.type === "CALL_RECORD_START"), false);
   assert.equal(h.session.values["callCapture:1"], undefined);
+});
+test("a customer switch cancels a pending call picker without blocking recording for the next customer", async () => {
+  const h = await harness(configured);
+  const customerA = context();
+  await h.publish(customerA);
+  h.setHoldCallCaptureChoice(true);
+  const pendingA = h.call("CALL_RECORD_START", { chatId: customerA.chatId });
+  await h.flush();
+  assert.equal(h.desktopCaptureCalls.length, 1);
+  assert.equal(h.session.values["callCapture:1"].chatId, customerA.chatId);
+  const customerB = { ...context("incoming-b"), chatId: "customer-b", name: "Customer B" };
+  await h.publish(customerB);
+  await h.flush();
+  const resultA = await pendingA;
+  assert.equal(resultA.ok, false);
+  assert.match(resultA.error, /customer changed/i);
+  assert.deepEqual(h.desktopCaptureCancels, [17]);
+  assert.equal(h.session.values["callCapture:1"], undefined);
+  h.setHoldCallCaptureChoice(false);
+  const resultB = await h.call("CALL_RECORD_START", { chatId: customerB.chatId });
+  assert.equal(resultB.ok, true);
+  assert.equal(resultB.value.chatId, customerB.chatId);
+  assert.equal(h.session.values["callCapture:1"].chatId, customerB.chatId);
+  h.completeCallCaptureChoice("late-stream");
+  assert.equal(h.session.values["callCapture:1"].chatId, customerB.chatId, "a late chooser callback from A cannot clear B's capture");
+  const activeB = h.session.values["callCapture:1"];
+  await h.publish(null as any);
+  assert.ok(h.contentRequests.some((m) => m.type === "CALL_RECORD_CANCEL" && m.sessionId === activeB.sessionId));
+  assert.equal(h.session.values["callCapture:1"], undefined, "losing the selected customer cancels its active capture");
 });
 test("call recorder follow-up RPCs require the one-use per-tab session token", async () => {
   const h = await harness(configured);

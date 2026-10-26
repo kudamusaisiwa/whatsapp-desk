@@ -149,7 +149,7 @@ test("one missing audio source prevents transcription", async () => {
   } finally { (dom.window as any).root.unmount(); dom.window.close(); }
 });
 
-test("switching chats preserves the call note and retries only into its original chat", async () => {
+test("switching customers clears the completed transcript and summary, including on return to the original customer", async () => {
   const requests:any[]=[];
   const dom=setup((message)=>{
     requests.push(message);
@@ -164,14 +164,111 @@ test("switching chats preserves the call note and retries only into its original
   try {
     await tick(); dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.click(); await tick();
     dom.window.document.querySelector<HTMLButtonElement>(".call-stop-button")!.click(); await tick(); await tick();
-    const other=state("chat-B"); (dom.window as any).fixture=other; (dom.window as any).renderFixture(); await tick();
-    assert.match(dom.window.document.body.textContent!,/Call the customer after receiving the signed form/);
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>("[aria-label='Call transcript']")!.value,"Call the customer after receiving the signed form.");
     dom.window.document.querySelector<HTMLButtonElement>(".call-summarize-button")!.click(); await tick(); await tick();
-    assert.equal(requests.some((r)=>r.type==="SYNC_MESSAGE"),false,"a call note is not inserted into the newly selected chat");
-    assert.match(dom.window.document.querySelector('[role="status"]')!.textContent!,/Open Original caller/);
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>("#call-action-note")!.value,"Call the customer after the signed form arrives.");
+    assert.equal(requests.find((r)=>r.type==="SYNC_MESSAGE").chatId,"chat-A","the completed note remains in its original WhatsApp chat");
+    const other=state("chat-B"); (dom.window as any).fixture=other; (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector("[aria-label='Call transcript']"),null);
+    assert.equal(dom.window.document.querySelector("#call-action-note"),null);
+    assert.equal(dom.window.document.querySelector(".call-recorder-origin"),null);
+    assert.equal(dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.textContent,"Record call");
     (dom.window as any).fixture=state("chat-A"); (dom.window as any).renderFixture(); await tick();
-    dom.window.document.querySelector<HTMLButtonElement>(".call-try-again")!.click(); await tick(); await tick();
-    assert.equal(requests.find((r)=>r.type==="SYNC_MESSAGE").chatId,"chat-A");
+    assert.equal(dom.window.document.querySelector("[aria-label='Call transcript']"),null,"returning to A starts a clean call-note session");
+    assert.equal(dom.window.document.querySelector("#call-action-note"),null);
+  } finally { (dom.window as any).root.unmount(); dom.window.close(); }
+});
+
+test("an active call remains during same-customer refresh, then cancels and clears when the customer closes", async () => {
+  const requests:any[]=[];
+  const dom=setup((message)=>{
+    requests.push(message);
+    if(message.type==="CALL_RECORD_START") return {sessionId:"call-switch",chatId:"chat-A",name:"Original caller",startedAt:Date.now()};
+    if(message.type==="CALL_RECORD_CANCEL") return {};
+    return {};
+  });
+  try {
+    await tick();
+    dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.click(); await tick();
+    assert.ok(dom.window.document.querySelector(".call-stop-button"));
+    (dom.window as any).fixture=state("chat-A"); (dom.window as any).renderFixture(); await tick();
+    assert.ok(dom.window.document.querySelector(".call-stop-button"),"same-chat refresh preserves an active call");
+    (dom.window as any).fixture=state(null); (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector(".call-stop-button"),null);
+    assert.equal(dom.window.document.querySelector(".call-transcript-details"),null);
+    assert.equal(dom.window.document.querySelector(".call-summary-block"),null);
+    assert.ok(requests.some((r)=>r.type==="CALL_RECORD_CANCEL" && r.sessionId==="call-switch"));
+    assert.equal(dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.disabled,true);
+    (dom.window as any).fixture=state("chat-A"); (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector(".call-stop-button"),null);
+    assert.equal(dom.window.document.querySelector(".call-transcript-details"),null);
+  } finally { (dom.window as any).root.unmount(); dom.window.close(); }
+});
+
+test("a stop that finishes after a customer switch is discarded without starting transcription", async () => {
+  const requests:any[]=[]; let finishStop:(value:any)=>void=()=>{};
+  const dom=setup((message)=>{
+    requests.push(message);
+    if(message.type==="CALL_RECORD_START") return {sessionId:"call-stop-switch",chatId:"chat-A",name:"Original caller",startedAt:Date.now()};
+    if(message.type==="CALL_RECORD_STOP") return new Promise((resolve)=>{finishStop=resolve;});
+    if(message.type==="CALL_RECORD_CANCEL") return {};
+    return {};
+  });
+  try {
+    await tick(); dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.click(); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>(".call-stop-button")!.click(); await tick();
+    (dom.window as any).fixture=state("chat-B"); (dom.window as any).renderFixture(); await tick();
+    finishStop({audio:"AQIDBA==",mimeType:"audio/webm",durationMs:3000,hasCallAudio:true,hasMicrophone:true}); await tick(); await tick();
+    assert.equal(requests.some((r)=>r.type==="TRANSCRIBE_CALL"),false);
+    assert.equal(dom.window.document.querySelector("[aria-label='Call transcript']"),null);
+    assert.equal(dom.window.document.querySelector("#call-action-note"),null);
+  } finally { (dom.window as any).root.unmount(); dom.window.close(); }
+});
+
+test("a transcription resolving after a customer switch cannot show or summarize the old call", async () => {
+  const requests:any[]=[]; let finishTranscription:(value:any)=>void=()=>{};
+  const dom=setup((message)=>{
+    requests.push(message);
+    if(message.type==="CALL_RECORD_START") return {sessionId:"call-transcribe-switch",chatId:"chat-A",name:"Original caller",startedAt:Date.now()};
+    if(message.type==="CALL_RECORD_STOP") return {audio:"AQIDBA==",mimeType:"audio/webm",durationMs:3000,hasCallAudio:true,hasMicrophone:true};
+    if(message.type==="TRANSCRIBE_CALL") return new Promise((resolve)=>{finishTranscription=resolve;});
+    return {};
+  });
+  try {
+    await tick(); dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.click(); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>(".call-stop-button")!.click(); await tick();
+    await tick();
+    assert.ok(requests.some((r)=>r.type==="TRANSCRIBE_CALL"));
+    (dom.window as any).fixture=state("chat-B"); (dom.window as any).renderFixture(); await tick();
+    finishTranscription({text:"Private transcript from A."}); await tick(); await tick();
+    assert.equal(dom.window.document.querySelector("[aria-label='Call transcript']"),null);
+    assert.equal(dom.window.document.querySelector(".call-summarize-button"),null);
+    assert.equal(requests.some((r)=>r.type==="SYNC_MESSAGE"),false);
+    (dom.window as any).fixture=state("chat-A"); (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector("[aria-label='Call transcript']"),null);
+  } finally { (dom.window as any).root.unmount(); dom.window.close(); }
+});
+
+test("a summary resolving after a customer switch cannot show or sync the old call note", async () => {
+  const requests:any[]=[]; let finishSummary:(value:any)=>void=()=>{};
+  const dom=setup((message)=>{
+    requests.push(message);
+    if(message.type==="CALL_RECORD_START") return {sessionId:"call-summary-switch",chatId:"chat-A",name:"Original caller",startedAt:Date.now()};
+    if(message.type==="CALL_RECORD_STOP") return {audio:"AQIDBA==",mimeType:"audio/webm",durationMs:3000,hasCallAudio:true,hasMicrophone:true};
+    if(message.type==="TRANSCRIBE_CALL") return {text:"We agreed to send the checklist."};
+    if(message.type==="SUMMARIZE_CALL") return new Promise((resolve)=>{finishSummary=resolve;});
+    return {};
+  });
+  try {
+    await tick(); dom.window.document.querySelector<HTMLButtonElement>(".call-record-button")!.click(); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>(".call-stop-button")!.click(); await tick(); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>(".call-summarize-button")!.click(); await tick();
+    (dom.window as any).fixture=state("chat-B"); (dom.window as any).renderFixture(); await tick();
+    finishSummary({text:"Stale summary from A."}); await tick(); await tick();
+    assert.equal(dom.window.document.querySelector("#call-action-note"),null);
+    assert.equal(requests.some((r)=>r.type==="SYNC_MESSAGE"),false);
+    (dom.window as any).fixture=state("chat-A"); (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector("#call-action-note"),null);
   } finally { (dom.window as any).root.unmount(); dom.window.close(); }
 });
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Desk AI for WhatsApp Web",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Business knowledge, AI reply drafts, client follow-ups and a live response-window timer inside WhatsApp Web.",
   "minimum_chrome_version": "120",
   "permissions": [

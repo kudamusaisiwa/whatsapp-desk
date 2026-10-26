@@ -25,7 +25,13 @@ export const formatDuration = (durationMs: number) => {
 };
 
 /** Captures a call locally in the WhatsApp tab, then makes a reviewable action note. */
-export function CallRecorder({ visible, desk, refresh, onStatusChange, openSignal }: { visible: boolean; desk: DeskState; refresh: () => Promise<void>; onStatusChange?: (status: CallStatus) => void; openSignal?: number }) {
+type CallRecorderProps = { visible: boolean; desk: DeskState; refresh: () => Promise<void>; onStatusChange?: (status: CallStatus) => void; openSignal?: number };
+export function CallRecorder(props: CallRecorderProps) {
+  const contextKey = props.desk.context?.chatId ?? "<no-chat>";
+  return <CallRecorderSession key={contextKey} {...props} />;
+}
+
+function CallRecorderSession({ visible, desk, refresh, onStatusChange, openSignal }: CallRecorderProps) {
   const [phase, setPhase] = useState<CallPhase>("idle");
   const [userOpen, setUserOpen] = useState(false);
   const rootRef = useRef<HTMLElement | null>(null);
@@ -198,6 +204,7 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
     setNotice("Stopping the call capture and preparing its transcript…");
     try {
       const audio = await rpc<{ audio: string; mimeType: string; durationMs: number; hasCallAudio?: boolean; hasMicrophone?: boolean }>("CALL_RECORD_STOP", { sessionId: active.sessionId });
+      if (!mounted.current || sessionRef.current?.sessionId !== active.sessionId) return;
       const finalStatus = {
         ...captureRef.current,
         phase: "stopped" as const,
@@ -219,7 +226,9 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
       setHasPendingAudio(true);
       await transcribePending(audio);
     } catch (e) {
+      if (!mounted.current) return;
       await rpc("CALL_RECORD_CANCEL", { sessionId: active.sessionId }).catch(() => {});
+      if (!mounted.current) return;
       sessionRef.current = null;
       setSession(null);
       setPhase(pendingAudio.current ? "transcription-error" : transcriptRef.current ? "ready" : "idle");
@@ -229,6 +238,7 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
   }
 
   async function transcribePending(audio: { audio: string; mimeType: string; durationMs: number }) {
+    if (!mounted.current) return;
     setPhase("transcribing");
     setError("");
     try {
@@ -260,7 +270,8 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
     if (!active) return;
     setNotice("Cancelling call recording…");
     try { await rpc("CALL_RECORD_CANCEL", { sessionId: active.sessionId }); }
-    catch (e) { setError(e instanceof Error ? e.message : "Recording cancellation could not be confirmed."); }
+    catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : "Recording cancellation could not be confirmed."); }
+    if (!mounted.current) return;
     sessionRef.current = null;
     setSession(null);
     setCapture(initialStatus);
@@ -392,7 +403,7 @@ export function CallRecorder({ visible, desk, refresh, onStatusChange, openSigna
       {phase === "transcribing" && <p className="call-recorder-status" role="status"><LoaderCircle size={14} className="spin" />{notice || "Transcribing call…"}</p>}
       {phase === "transcription-error" && hasPendingAudio && <button type="button" className="text-button call-try-again" onClick={retryTranscription}>Retry transcription</button>}
       {phase === "summarizing" && <p className="call-recorder-status" role="status"><LoaderCircle size={14} className="spin" />Writing the call summary…</p>}
-      {callOrigin && <p className="call-recorder-target-note">Notes stay linked to {callOrigin.name} if you switch WhatsApp chats.</p>}
+      {callOrigin && <p className="call-recorder-target-note">Changing customers clears this temporary transcript and summary.</p>}
       {notice && phase !== "transcribing" && phase !== "summarizing" && <p className="call-recorder-status" role="status">{notice}</p>}
       {error && <p className="call-recorder-error" role="alert">{error}</p>}
       {transcript && <details className="call-transcript-details">
