@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-desk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Open-source Desk AI assistant for WhatsApp Web with local knowledge and per-task AI providers",
   "scripts": {
     "dev": "vite",

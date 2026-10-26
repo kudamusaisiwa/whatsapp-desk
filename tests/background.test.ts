@@ -115,6 +115,7 @@ async function harness(
   const desktopCaptureCalls: any[] = [];
   const desktopCaptureCancels: number[] = [];
   let onFetch: (() => void) | null = null;
+  let fetchGate: Promise<void> | null = null;
   let onPlace: ((count: number) => void) | null = null;
   let onRead: (() => Promise<unknown>) | null = null;
   const alarm = event(),
@@ -243,6 +244,8 @@ async function harness(
           : null;
       requests.push({ url, body });
       onFetch?.();
+      const gate = fetchGate;
+      if (gate) await gate;
       return {
         ok: true,
         json: async () =>
@@ -405,6 +408,7 @@ async function harness(
     setOnFetch: (f: () => void) => {
       onFetch = f;
     },
+    setFetchGate: (gate: Promise<void> | null) => { fetchGate = gate; },
     publish: async (c: ChatContext) => {
       current = c;
       return call("CONTEXT", { context: c }, content);
@@ -1160,6 +1164,75 @@ test("manual generation never enters automatic send preparation even when auto-s
   assert.equal((await h.call("GET_STATE")).value.replyTiming, null);
 });
 
+test("manual generation rejects an instruction captured for a different customer before calling the provider", async () => {
+  const h = await harness(configured);
+  await h.publish(context());
+  h.setContext({ ...context(), chatId: "customer-b" });
+  const result = await h.call("GENERATE", {
+    assistOnly: true,
+    expectedChatId: "123456@lid",
+    instruction: "Explain this to customer A",
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /customer changed/i);
+  assert.equal(h.requests.length, 0);
+});
+test("assist-only A result is rejected after an A→B→A switch and is never persisted", async () => {
+  const h = await harness(configured);
+  const customerA = context();
+  await h.publish(customerA);
+  let started!: () => void;
+  const fetchStarted = new Promise<void>((resolve) => { started = resolve; });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  h.setFetchGate(gate);
+  h.setOnFetch(started);
+  const pending = h.call("GENERATE", {
+    assistOnly: true,
+    expectedChatId: customerA.chatId,
+    instruction: "Explain this to customer A",
+  });
+  await fetchStarted;
+  await h.publish({ ...context("b"), chatId: "customer-b" });
+  await h.publish(customerA);
+  release();
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.match(result.error, /customer changed/i);
+  assert.equal(h.session.values["draft:1"], undefined);
+  assert.equal((await h.call("GET_STATE")).value.draft, null);
+});
+test("a new customer's assist-only request proceeds while the previous customer's request finishes", async () => {
+  const h = await harness(configured);
+  const customerA = context();
+  await h.publish(customerA);
+  let started!: () => void;
+  const fetchStarted = new Promise<void>((resolve) => { started = resolve; });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  h.setFetchGate(gate);
+  h.setOnFetch(started);
+  const pendingA = h.call("GENERATE", {
+    assistOnly: true,
+    expectedChatId: customerA.chatId,
+    instruction: "Explain this to customer A",
+  });
+  await fetchStarted;
+  const customerB = { ...context("b"), chatId: "customer-b" };
+  await h.publish(customerB);
+  h.setFetchGate(null);
+  const resultB = await h.call("GENERATE", {
+    assistOnly: true,
+    expectedChatId: customerB.chatId,
+    instruction: "Explain this to customer B",
+  });
+  assert.equal(resultB.ok, true);
+  assert.equal(resultB.value.chatId, "customer-b");
+  release();
+  const resultA = await pendingA;
+  assert.equal(resultA.ok, false);
+  assert.equal((await h.call("GET_STATE")).value.draft, null);
+});
 test("screenshots are sent as image input, with pixels absent from saved state and keys absent from requests", async () => {
   const h = await harness(configured);
   const c = context("screen");

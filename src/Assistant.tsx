@@ -17,8 +17,21 @@ const polishOptions: { style: PolishStyle; label: string }[] = [
   { style: "summarize", label: "Summarize" },
 ];
 
+type AssistantProps = { desk: DeskState; refresh: () => Promise<void>; openSettings: () => void };
+
 /** Manual assistance stays available independently of WhatsApp's send controls. */
-export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; refresh: () => Promise<void>; openSettings: () => void }) {
+export function Assistant(props: AssistantProps) {
+  const identity = props.desk.context?.chatId ?? "<no-chat>";
+  const previousIdentity = useRef(identity);
+  const hideSavedBefore = useRef(0);
+  if (previousIdentity.current !== identity) {
+    hideSavedBefore.current = Date.now();
+    previousIdentity.current = identity;
+  }
+  return <AssistantSession key={identity} {...props} hideSavedBefore={hideSavedBefore.current} />;
+}
+
+function AssistantSession({ desk, refresh, openSettings, hideSavedBefore }: AssistantProps & { hideSavedBefore: number }) {
   const [instruction, setInstruction] = useState("");
   const [result, setResult] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +74,8 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const context = desk.context;
-  const saved = desk.draft?.chatId === context?.chatId && desk.draft?.incomingId === context?.lastIncomingId ? desk.draft : null;
+  const savedCandidate = desk.draft?.chatId === context?.chatId && desk.draft?.incomingId === context?.lastIncomingId ? desk.draft : null;
+  const saved = savedCandidate && savedCandidate.createdAt > hideSavedBefore ? savedCandidate : null;
   const suggestion = result ?? saved;
   contextRef.current = desk.context;
   const suggestionKey = suggestion ? `${suggestion.createdAt}:${suggestion.reply}` : "";
@@ -106,14 +120,15 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
     setError("");
     setCopied(false);
     try {
-      const reply = await rpc<Draft>("GENERATE", { instruction: instruction.trim(), assistOnly: true });
+      const reply = await rpc<Draft>("GENERATE", { instruction: instruction.trim(), assistOnly: true, expectedChatId: contextId });
+      if (!mounted.current) return;
       setResult(reply);
       void refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Assistance could not finish. Please try again.");
+      if (mounted.current) setError(e instanceof Error ? e.message : "Assistance could not finish. Please try again.");
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -266,7 +281,7 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
     setError("");
     try {
       const response = await rpc<{ text: string }>("POLISH_TEXT", { text: submitted, style });
-      if (contentRevision.current !== revision || instructionRef.current !== prior) return;
+      if (!mounted.current || contentRevision.current !== revision || instructionRef.current !== prior) return;
       if (typeof response.text !== "string" || response.text.length > 5000) throw new Error("The polished text was too long. Your draft is unchanged.");
       const next = response.text;
       contentRevision.current++;
@@ -275,9 +290,9 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
       setUndoText(prior);
       if (dictatedRef.current) queueSync(next, target);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not polish this text. Your draft is unchanged.");
+      if (mounted.current) setError(e instanceof Error ? e.message : "Could not polish this text. Your draft is unchanged.");
     } finally {
-      setPolishing(false);
+      if (mounted.current) setPolishing(false);
     }
   }
 
@@ -358,8 +373,8 @@ export function Assistant({ desk, refresh, openSettings }: { desk: DeskState; re
               <strong>{suggestion.contextName ? `Suggestion · ${suggestion.contextName}` : "Your suggestion"}</strong>
               <span className="assistant-result-actions">
                 <button className="text-button" onClick={async () => {
-                  try { await navigator.clipboard.writeText(suggestion.reply); setCopied(true); }
-                  catch { setError("Copy was unavailable. Select the suggestion text to copy it."); }
+                  try { await navigator.clipboard.writeText(suggestion.reply); if (mounted.current) setCopied(true); }
+                  catch { if (mounted.current) setError("Copy was unavailable. Select the suggestion text to copy it."); }
                 }} aria-label="Copy suggestion">
                   {copied ? <Check size={14} /> : <Copy size={14} />}{copied ? "Copied" : "Copy"}
                 </button>

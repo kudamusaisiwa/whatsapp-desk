@@ -87,7 +87,7 @@ test("the typed question and suggestion survive visiting another tab", async () 
   } finally { p.close(); }
 });
 
-test("the typed question survives a chat opening", async () => {
+test("an instruction written without a customer is cleared when a customer opens", async () => {
   const p = mountPanel((fixture) => { fixture.context = null; });
   try {
     await tick(80);
@@ -98,8 +98,8 @@ test("the typed question survives a chat opening", async () => {
     await p.refresh();
     assert.ok(p.q(".client-bar"));
     assert.equal(p.q(".no-chat-hint"), null);
-    assert.equal(p.q("#assistant-instruction"), input);
-    assert.equal(input.value, "Draft something for the next chat");
+    assert.notEqual(p.q("#assistant-instruction"), input);
+    assert.equal(p.q<HTMLTextAreaElement>("#assistant-instruction")!.value, "");
   } finally { p.close(); }
 });
 

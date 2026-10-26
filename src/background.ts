@@ -672,6 +672,8 @@ interface InboxLease {
   busyUntil: number;
 }
 const activeGenerations = new Set<number>();
+const activePanelGenerations = new Set<string>();
+const contextEpochByTab = new Map<number, number>();
 async function assertInboxControl(tabId: number, token: string) {
   const d = await data();
   const lease = (await chrome.storage.session.get("inboxLease")).inboxLease as
@@ -717,9 +719,17 @@ async function generate(
   inboxToken?: string,
   manual: GeneratePayload = {},
 ): Promise<Draft> {
-  if (activeGenerations.has(tabId))
-    throw new Error("A reply is already being prepared. Please wait.");
-  activeGenerations.add(tabId);
+  const panelKey = `${tabId}:${contextEpochByTab.get(tabId) ?? 0}`;
+  const isPanel = manual.assistOnly === true;
+  if (isPanel) {
+    if (activePanelGenerations.has(panelKey))
+      throw new Error("A reply is already being prepared. Please wait.");
+    activePanelGenerations.add(panelKey);
+  } else {
+    if (activeGenerations.has(tabId))
+      throw new Error("A reply is already being prepared. Please wait.");
+    activeGenerations.add(tabId);
+  }
   try {
     return await generateReply(
       tabId,
@@ -729,7 +739,8 @@ async function generate(
       manual,
     );
   } finally {
-    activeGenerations.delete(tabId);
+    if (isPanel) activePanelGenerations.delete(panelKey);
+    else activeGenerations.delete(tabId);
   }
 }
 async function generateReply(
@@ -740,7 +751,11 @@ async function generateReply(
   manual: GeneratePayload = {},
 ): Promise<Draft> {
   if (inboxToken) await assertInboxControl(tabId, inboxToken);
+  const startContextEpoch = contextEpochByTab.get(tabId) ?? 0;
   const observedContext = await freshContext(tabId);
+  if (manual.assistOnly === true && Object.hasOwn(manual, "expectedChatId") &&
+      (observedContext?.chatId ?? null) !== manual.expectedChatId)
+    throw new Error("The WhatsApp customer changed. Enter your instruction again for the selected customer.");
   const d = await data();
   const instruction =
     typeof manual.instruction === "string"
@@ -962,6 +977,13 @@ async function generateReply(
     draft.contextName = observedContext?.name ?? "General assistance";
     draft.placement = "Suggestion kept in Desk for review";
     draft.placementReason = "panel-only";
+    if (assistOnly) {
+      const latestContext = await freshContext(tabId);
+      if ((contextEpochByTab.get(tabId) ?? 0) !== startContextEpoch ||
+          (Object.hasOwn(manual, "expectedChatId") && (latestContext?.chatId ?? null) !== manual.expectedChatId))
+        throw new Error("The WhatsApp customer changed. Enter your instruction again for the selected customer.");
+      return draft;
+    }
     await savePanelDraft(tabId, draft);
     await setActivity(tabId, draft.placement);
     return draft;
@@ -1064,6 +1086,11 @@ async function recordContext(raw: ChatContext | null, tabId: number) {
       atBottom: !!raw.atBottom,
       observedAt: Date.now(),
     };
+  }
+  if ((prev?.chatId ?? null) !== (c?.chatId ?? null)) {
+    contextEpochByTab.set(tabId, (contextEpochByTab.get(tabId) ?? 0) + 1);
+    await chrome.storage.session.remove(`draft:${tabId}`);
+    await setActivity(tabId, "");
   }
   await chrome.storage.session.set({ [sessionKey(tabId)]: c });
   if (!c) {
@@ -1814,6 +1841,7 @@ async function handle(m: any, sender: chrome.runtime.MessageSender) {
         return await generate(tabId, false, undefined, undefined, {
           instruction: m.instruction,
           assistOnly: m.assistOnly === true,
+          ...(Object.hasOwn(m, "expectedChatId") ? { expectedChatId: m.expectedChatId } : {}),
         });
       } catch (e) {
         if (!(await pendingReplies())[tabId])

@@ -1,5 +1,5 @@
 DESK AI FOR WHATSAPP WEB — START HERE
-Chrome extension • Version 0.5.0 • Bring your own provider API key
+Chrome extension • Version 0.5.1 • Bring your own provider API key
 
 1. INSTALL IN CHROME
 

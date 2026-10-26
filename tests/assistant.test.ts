@@ -194,6 +194,53 @@ test("a newer panel edit wins over a pending polish result", async () => {
   } finally { (dom.window as any).root.unmount(); dom.window.close(); }
 });
 
+test("polish finishing after a customer switch cannot restore the old instruction", async () => {
+  const dom=new JSDOM('<div id="root"></div>',{url:'https://extension.test/panel.html?tabId=1',runScripts:'outside-only',pretendToBeVisual:true});
+  let finishPolish:(value:any)=>void=()=>{};
+  (dom.window as any).fixture=state('human takeover');
+  (dom.window as any).chrome={runtime:{id:'fixture',sendMessage:(message:any)=>{
+    if(message.type==='POLISH_TEXT') return new Promise((resolve)=>{finishPolish=resolve;});
+    return Promise.resolve({ok:true,value:{}});
+  }}};
+  try {
+    dom.window.eval(bundle); await tick();
+    const input=dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!;
+    Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value')!.set!.call(input,'private wording for A');
+    input.dispatchEvent(new dom.window.Event('input',{bubbles:true})); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>('.polish-trigger')!.click(); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>('[role="menuitem"]').click(); await tick();
+    const customerB=state('human takeover'); customerB.context={...customerB.context!,chatId:'customer-b',name:'Customer B'};
+    (dom.window as any).fixture=customerB; (dom.window as any).renderFixture(); await tick();
+    finishPolish({ok:true,value:{text:'stale polished A text'}}); await tick(); await tick();
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'');
+    assert.doesNotMatch(dom.window.document.body.textContent!,/stale polished A text/);
+  } finally {(dom.window as any).root.unmount();dom.window.close();}
+});
+
+test("transcription finishing after a customer switch cannot populate the new customer's instruction", async () => {
+  const dom=new JSDOM('<div id="root"></div>',{url:'https://extension.test/panel.html?tabId=1',runScripts:'outside-only',pretendToBeVisual:true});
+  let finishTranscript:(value:any)=>void=()=>{};
+  const requests:any[]=[];
+  (dom.window as any).fixture=state('human takeover');
+  (dom.window as any).chrome={runtime:{id:'fixture',sendMessage:(message:any)=>{
+    requests.push(message);
+    if(message.type==='RECORD_AUDIO_STOP') return Promise.resolve({ok:true,value:{audio:'AQIDBA==',mimeType:'audio/webm'}});
+    if(message.type==='TRANSCRIBE_AUDIO') return new Promise((resolve)=>{finishTranscript=resolve;});
+    return Promise.resolve({ok:true,value:{}});
+  }}};
+  try {
+    dom.window.eval(bundle); await tick();
+    const mic=()=>dom.window.document.querySelector<HTMLButtonElement>('.speech-input__toggle')!;
+    mic().click(); await tick(); mic().click(); await tick(); await tick();
+    assert.ok(requests.some((r)=>r.type==='TRANSCRIBE_AUDIO'));
+    const customerB=state('human takeover'); customerB.context={...customerB.context!,chatId:'customer-b',name:'Customer B'};
+    (dom.window as any).fixture=customerB; (dom.window as any).renderFixture(); await tick();
+    finishTranscript({ok:true,value:{text:'stale transcript for A'}}); await tick(); await tick();
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'');
+    assert.equal(requests.some((r)=>r.type==='SYNC_MESSAGE'),false);
+  } finally {(dom.window as any).root.unmount();dom.window.close();}
+});
+
 test("a confirmed WhatsApp send starts the next recording as a fresh draft", async () => {
   const dom=new JSDOM('<div id="root"></div>',{url:'https://extension.test/panel.html?tabId=1',runScripts:'outside-only',pretendToBeVisual:true});
   const requests:any[]=[];
@@ -245,7 +292,7 @@ test("an old matching outgoing message does not clear a draft after a manual com
   } finally {(dom.window as any).root.unmount();dom.window.close();}
 });
 
-test("dictation remains bound to the chat selected when recording starts", async () => {
+test("switching customers cancels an active recording and clears its transcript session", async () => {
   const dom = new JSDOM('<div id="root"></div>', {url: 'https://extension.test/panel.html?tabId=1', runScripts:'outside-only',pretendToBeVisual:true});
   const requests: any[] = [];
   (dom.window as any).fixture = state('human takeover');
@@ -265,12 +312,9 @@ test("dictation remains bound to the chat selected when recording starts", async
     (dom.window as any).fixture = changed;
     (dom.window as any).renderFixture();
     await tick();
-    dom.window.document.querySelector<HTMLButtonElement>('.speech-input__toggle')!.click();
-    await tick();
-    await tick();
     assert.equal(requests.some((request)=>request.type==='SYNC_MESSAGE'),false);
-    assert.match(dom.window.document.querySelector('[role="alert"]')!.textContent!,/Open Test customer/);
-    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'This message is for the original chat.');
+    assert.ok(requests.some((request)=>request.type==='RECORD_AUDIO_CANCEL'));
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'');
   } finally {
     (dom.window as any).root.unmount();
     dom.window.close();
@@ -282,6 +326,65 @@ const suggestionFor = (overrides: Record<string, unknown> = {}) => ({
   chatId: "fixture", contextName: "Test customer", incomingId: null, createdAt: 1700000000000,
   placementReason: "panel-only", ...overrides,
 });
+
+test("customer switches clear customer-specific assistant state while same-chat refresh preserves edits", async () => {
+  const dom = new JSDOM('<div id="root"></div>', {url:'https://extension.test/panel.html?tabId=1',runScripts:'outside-only',pretendToBeVisual:true});
+  (dom.window as any).fixture=state('human takeover');
+  (dom.window as any).fixture.draft=suggestionFor() as any;
+  (dom.window as any).chrome={runtime:{id:'fixture',sendMessage:async()=>({ok:true,value:{}})}};
+  try {
+    dom.window.eval(bundle); await tick();
+    assert.match(dom.window.document.body.textContent!,/checklist you asked for/);
+    const input=dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!;
+    Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value')!.set!.call(input,'private instruction for A');
+    input.dispatchEvent(new dom.window.Event('input',{bubbles:true})); await tick();
+    (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'private instruction for A');
+    const customerB=state('human takeover'); customerB.context={...customerB.context!,chatId:'customer-b',name:'Customer B'};
+    (dom.window as any).fixture=customerB; (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'');
+    assert.equal(dom.window.document.querySelector('.draft-text'),null);
+    customerB.context={...customerB.context!,chatId:'fixture',name:'Test customer'};
+    customerB.draft=suggestionFor() as any;
+    (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector('.draft-text'),null,'A→B→A does not restore an earlier saved suggestion');
+  } finally {(dom.window as any).root.unmount();dom.window.close();}
+});
+
+test("pending generation from the previous customer is ignored and a new request uses only the new instruction", async () => {
+  const dom = new JSDOM('<div id="root"></div>', {url:'https://extension.test/panel.html?tabId=1',runScripts:'outside-only',pretendToBeVisual:true});
+  const requests:any[]=[]; let finishOld:(value:any)=>void=()=>{};
+  (dom.window as any).fixture=state('human takeover');
+  (dom.window as any).chrome={runtime:{id:'fixture',sendMessage:(message:any)=>{
+    requests.push(message);
+    if(message.type==='GENERATE' && requests.filter((r)=>r.type==='GENERATE').length===1) return new Promise((resolve)=>{finishOld=resolve;});
+    if(message.type==='GENERATE') return Promise.resolve({ok:true,value:suggestionFor({chatId:'customer-b',contextName:'Customer B',reply:'B only'})});
+    return Promise.resolve({ok:true,value:{}});
+  }}};
+  try {
+    dom.window.eval(bundle); await tick();
+    const input=dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!;
+    Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value')!.set!.call(input,'instruction for A');
+    input.dispatchEvent(new dom.window.Event('input',{bubbles:true})); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>('.draft-button')!.click(); await tick();
+    const customerB=state('human takeover'); customerB.context={...customerB.context!,chatId:'customer-b',name:'Customer B'};
+    (dom.window as any).fixture=customerB; (dom.window as any).renderFixture(); await tick();
+    assert.equal(dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!.value,'');
+    finishOld({ok:true,value:suggestionFor({reply:'stale A result'})}); await tick(); await tick();
+    assert.equal(dom.window.document.querySelector('.draft-text'),null);
+    const inputB=dom.window.document.querySelector<HTMLTextAreaElement>('#assistant-instruction')!;
+    Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value')!.set!.call(inputB,'new instruction for B');
+    inputB.dispatchEvent(new dom.window.Event('input',{bubbles:true})); await tick();
+    dom.window.document.querySelector<HTMLButtonElement>('.draft-button')!.click(); await tick(); await tick();
+    const generateRequests=requests.filter((r)=>r.type==='GENERATE');
+    assert.equal(generateRequests[0].expectedChatId,'fixture');
+    assert.equal(generateRequests[1].expectedChatId,'customer-b');
+    assert.equal(generateRequests[0].instruction,'instruction for A');
+    assert.equal(generateRequests[1].instruction,'new instruction for B');
+    assert.equal(dom.window.document.querySelector('.draft-text')!.textContent,'B only');
+  } finally {(dom.window as any).root.unmount();dom.window.close();}
+});
+
 function mountAssistant(kind: string, handler: (message: any) => any, prepare: (fixture: DeskState) => void = () => {}) {
   const dom = new JSDOM('<div id="root"></div>', {url: 'https://extension.test/panel.html?tabId=1', runScripts: 'outside-only', pretendToBeVisual: true});
   const requests: any[] = [];
@@ -328,16 +431,15 @@ test("Insert into chat refuses an occupied composer without writing", async () =
   } finally { (m.dom.window as any).root.unmount(); m.dom.window.close(); }
 });
 
-test("Insert into chat is disabled for a suggestion written for another chat", async () => {
+test("switching customers clears the prior customer's suggestion before it can be inserted", async () => {
   const m = mountAssistant("human takeover", (message) => message.type === 'GENERATE' ? suggestionFor() : {});
   try {
     await tick(); await m.generate();
     assert.equal(m.insert()!.disabled, false);
     m.fixture.context = {...m.fixture.context!, chatId: 'other', name: 'Other chat'};
     (m.dom.window as any).renderFixture(); await tick();
-    assert.equal(m.insert()!.disabled, true);
-    assert.match(m.doc.body.textContent!, /Written for Test customer\. Open that chat to insert it\./);
-    m.insert()!.click(); await tick();
+    assert.equal(m.doc.querySelector('.draft-text'), null);
+    assert.equal(m.insert(), null);
     assert.equal(writes(m.requests).length, 0);
   } finally { (m.dom.window as any).root.unmount(); m.dom.window.close(); }
 });

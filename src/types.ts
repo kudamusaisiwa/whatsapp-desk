@@ -73,6 +73,8 @@ export interface Draft {
 export interface GeneratePayload {
   instruction?: string;
   assistOnly?: boolean;
+  /** Customer shown when the panel request was started; null means general assistance. */
+  expectedChatId?: string | null;
 }
 export interface ReplyTiming {
   chatId: string;

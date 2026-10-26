@@ -1,4 +1,30 @@
-# Desk AI for WhatsApp Web v0.5.0
+# Desk AI for WhatsApp Web v0.5.1
+
+A customer-isolation patch release for the open-source extension.
+
+## What changed
+
+- Switching customers clears the assistant instruction, generated suggestion, dictated text, polish undo state, and transient assistant status.
+- Late generation, polish, and transcription results from the previous customer are ignored; stale requests are rejected even if the user switches away and returns before they finish.
+- Editing within the same customer is preserved across refreshes. Client notes, business knowledge, saved WhatsApp drafts, and call notes remain intact.
+
+## Install or update
+
+**[Download WhatsApp-Desk.zip](https://github.com/kudamusaisiwa/whatsapp-desk/releases/download/v0.5.1/WhatsApp-Desk.zip)** and unzip it. In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, then select **WhatsApp Desk/releases/WhatsApp-Desk** inside the download. If updating an existing installation, replace its extension files in the same folder and press **Reload** to retain that extension’s local workspace. Refresh WhatsApp Web.
+
+In **Settings**, select a credential provider, save your own key, then configure each task’s provider and model under **AI tasks and models**. Refresh model choices for your account or enter the exact model ID. Save workspace settings before using a changed route. Upload approved business knowledge and review drafts before sending.
+
+The ZIP includes visual and plain-text setup guides, the MIT license and third-party notices. GitHub’s Source code downloads are developer archives, not installable builds.
+
+## Verification and limits
+
+All **205 automated tests** pass, including customer-switch, stale async result, provider routing, storage, adapter, and UI checks. TypeScript, production builds, ZIP integrity checks, and built-folder/final-ZIP secret scans pass. Automated tests do not establish live behavior in a recipient’s Chrome/WhatsApp installation. No keys, browser profiles, customer conversations, or business knowledge are included.
+
+SHA-256 checksums and a package audit inventory accompany the extension assets.
+
+---
+
+# Desk AI for WhatsApp Web v0.5.0 (previous release)
 
 Choose the AI provider and model for each part of your desk. This MIT-licensed open-source release is by **Kudakwashe Musasiwa**.
 
